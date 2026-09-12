@@ -200,8 +200,13 @@ func (c *NessieClient) fetch(ctx context.Context) (*NessieSnapshot, error) {
 		if err != nil {
 			return nil, err
 		}
+		// Verified behaviour of the live sandbox, 2026-09-12: an unrecognised key
+		// returns HTTP 200 with an empty array rather than an authentication
+		// error, and a missing account id returns 404 with an empty body. An
+		// empty list therefore means "this key sees nothing", not "no accounts
+		// exist", and must fall back rather than produce a zero balance.
 		if len(accounts) == 0 {
-			return nil, fmt.Errorf("nessie key returned no accounts")
+			return nil, fmt.Errorf("the configured key returned no accounts (the sandbox answers 200 with an empty list for an unrecognised key)")
 		}
 		// Prefer the account with the largest balance so the demo has headroom.
 		acct = accounts[0]
@@ -215,6 +220,9 @@ func (c *NessieClient) fetch(ctx context.Context) (*NessieSnapshot, error) {
 		ks, err := c.get(ctx, "/accounts/"+accountID, &acct)
 		if err != nil {
 			return nil, err
+		}
+		if acct.ID == "" {
+			return nil, fmt.Errorf("nessie returned no account for the configured id")
 		}
 		fields = ks
 	}

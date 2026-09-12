@@ -194,10 +194,67 @@ func (s *Server) answer(ctx context.Context, b *workspace.Builder, ws contracts.
 			return resp
 		}
 	}
-	resp.Answer = strings.Join(facts, " ")
+	resp.Answer = engineAnswer(b, ws, node, intent)
 	resp.AnswerSource = "engine_fallback"
 	resp.Unavailable = s.ai.Status().Detail
 	return resp
+}
+
+// engineAnswer writes the answer itself when no model is available. It is
+// deliberately short and picks what the question asked for, rather than
+// concatenating every fact the engine knows.
+func engineAnswer(b *workspace.Builder, ws contracts.WorkspaceResponse, node *contracts.ChainNode, intent ai.Intent) string {
+	res := ws.Scenario
+	o := b.Store.Olist
+
+	if node != nil && (intent == ai.IntentExplainNode || intent == ai.IntentEvidence) {
+		out := node.Explanation
+		if intent == ai.IntentEvidence && len(node.Claims) > 0 {
+			var parts []string
+			for _, c := range node.Claims {
+				parts = append(parts, fmt.Sprintf("%s — %s, from %s",
+					c.Label, c.Display, contracts.ProvenanceWords[c.Provenance]))
+			}
+			out += " The figures behind it: " + strings.Join(parts, "; ") + "."
+		}
+		return out
+	}
+
+	switch intent {
+	case ai.IntentCompanySummary:
+		delta := ""
+		if o.PriorWindow.ItemRevenueCents > 0 {
+			pct := float64(o.Window.ItemRevenueCents-o.PriorWindow.ItemRevenueCents) /
+				float64(o.PriorWindow.ItemRevenueCents) * 100
+			delta = fmt.Sprintf(" Recorded item sales were %s over the 30-day window, %+.1f%% against the 30 days before it, on %d items either side.",
+				finance.FormatBRL(o.Window.ItemRevenueCents), pct, o.Window.ItemCount)
+		}
+		return fmt.Sprintf("%s%s Those sales are historical marketplace records in BRL, not bank deposits, and this workspace shows no margin because the source has no record of what anything cost you.",
+			res.Verdict, delta)
+
+	case ai.IntentExplainCash:
+		return fmt.Sprintf("%s %s",
+			res.Verdict, res.DelayBreakpoint.Explanation)
+
+	case ai.IntentScenarioResult:
+		out := res.Verdict
+		for _, a := range res.Alternatives {
+			out += fmt.Sprintf(" %s: lowest %s on %s, %s the reserve.",
+				a.Label, finance.FormatUSD(a.LowestCents), finance.HumanDate(a.LowestDate),
+				map[bool]string{true: "below", false: "at or above"}[a.BreachesReserve])
+		}
+		if len(res.Caveats) > 0 {
+			out += " " + res.Caveats[0]
+		}
+		return out
+
+	case ai.IntentEvidence:
+		return fmt.Sprintf("The opening balance of %s comes from %s. Everything after it is calculated here: the lowest projected point is %s on %s against your %s reserve. Open any figure's source chip to read the exact record or assumption behind it.",
+			finance.FormatUSD(res.BaselineBalanceCents), res.BaselineSource,
+			finance.FormatUSD(res.LowestCents), finance.HumanDate(res.LowestDate),
+			finance.FormatUSD(res.ReserveCents))
+	}
+	return res.Verdict
 }
 
 func styleFor(i ai.Intent) string {
