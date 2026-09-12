@@ -1,7 +1,10 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
 import type { Chain, WorkspaceResponse } from '../types/contracts'
 import { addDays, daysBetween, parseDay, shortDate, usd } from '../lib/format'
 import { CARD_H, CARD_H_COMPACT, CARD_W, EventCard } from './EventCard'
+import { EventMarker } from './EventMarker'
+import { InsightBand } from './InsightBand'
 import { BAND_H, CashComparison } from './CashComparison'
 import { ChainEntry, ENTRY_DROP, ENTRY_H } from './ChainEntry'
 import {
@@ -15,6 +18,35 @@ const CARD_ROW_GAP = 6
 const MIN_CANVAS_H = 460
 /** Thickness of the timeline rail the chains hang from. */
 const RAIL_H = 14
+/**
+ * Height reserved immediately above the rail for the Today and Lowest pills.
+ * Without it the bottom card row and the pills were laid out independently and
+ * overlapped by nine pixels at every window size.
+ */
+const PILL_LANE = 46
+/**
+ * Ticks plus dated labels drawn under the rail. A chain tag hanging below has
+ * to clear them, or it sits on top of the calendar it is pointing at.
+ */
+const AXIS_LABELS_H = 18
+/**
+ * How far above the rail the Today and Lowest pills sit. It has to clear the
+ * markers, which now stand proud of the rail rather than inside it.
+ */
+const PILL_DROP = 36
+/** Padding left around the focused chain when the camera frames it. */
+const FOCUS_PAD = 46
+/** The camera never magnifies past this, however small the chain. */
+const MAX_ZOOM = 1.8
+/**
+ * ...nor shrinks past this, however wide the step's subject. Below about this
+ * the node text stops being comfortably readable, so a step whose events span
+ * more than the frame can hold gives up showing all of them rather than
+ * shrinking the chain into illegibility.
+ */
+const MIN_ZOOM = 0.82
+/** Opacity the rail and calendar fall to while a chain holds the frame. */
+const CONTEXT_DIM = 0.28
 
 /**
  * The timeline: one horizontal rail through the middle of the workspace, with
@@ -32,7 +64,9 @@ export function TimelineWorkspace({
   onSelectNode,
   onSelectEvent,
   onToggleChain,
+  onOpenInsight,
   rightInset = 0,
+  panelW = 0,
 }: {
   ws: WorkspaceResponse
   selectedNodeId: string | null
@@ -41,8 +75,12 @@ export function TimelineWorkspace({
   onSelectNode: (id: string) => void
   onSelectEvent: (id: string) => void
   onToggleChain: (id: string) => void
+  /** Opens the full reading of the band drawn on the rail. */
+  onOpenInsight: () => void
   /** Width of an open drawer, so nothing important is parked underneath it. */
   rightInset?: number
+  /** Width of the description panel, so the camera frames the chain beside it. */
+  panelW?: number
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const frameRef = useRef<HTMLDivElement>(null)
@@ -70,14 +108,27 @@ export function TimelineWorkspace({
     [ws.windowStart],
   )
 
-  // Event cards stack into as few rows as fit without overlapping.
+  const chainRoots = useMemo(
+    () => new Set(ws.chains.map((c) => c.rootEventId)),
+    [ws.chains],
+  )
+
+  const visibleEvents = useMemo(
+    () =>
+      ws.events
+        .filter((e) => e.kind !== 'balance')
+        .filter((e) => e.date >= ws.windowStart && e.date <= ws.windowEnd)
+        .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)),
+    [ws.events, ws.windowStart, ws.windowEnd],
+  )
+
+  // Every event gets a row, whether or not it is currently showing a card.
+  // Packing only the visible ones made the band change height as a step
+  // revealed or released events, which moved the rail — and the chain hanging
+  // off it — underneath the camera.
   const placed = useMemo(() => {
-    const visible = ws.events
-      .filter((e) => e.kind !== 'balance')
-      .filter((e) => e.date >= ws.windowStart && e.date <= ws.windowEnd)
-      .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
     const rowEnds: number[] = []
-    return visible.map((e) => {
+    return visibleEvents.map((e) => {
       const left = x(e.date) - CARD_W / 2
       let row = rowEnds.findIndex((end) => left > end + 10)
       if (row === -1) {
@@ -87,7 +138,18 @@ export function TimelineWorkspace({
       rowEnds[row] = left + CARD_W
       return { event: e, row }
     })
-  }, [ws.events, ws.windowStart, ws.windowEnd, x])
+  }, [visibleEvents, x])
+
+  // The events the step being read is about. Named by the Go rule that wrote
+  // the step, never inferred here from dates or wording.
+  const revealed = useMemo(() => {
+    if (!openChainId || !selectedNodeId) return new Set<string>()
+    const node = ws.chains
+      .find((c) => c.id === openChainId)
+      ?.nodes.find((n) => n.id === selectedNodeId)
+    return new Set(node?.highlightEventIds ?? [])
+  }, [ws.chains, openChainId, selectedNodeId])
+
 
   const compact = frameH < 560
   const nodeH = compact ? NODE_H_COMPACT : NODE_H
@@ -96,7 +158,22 @@ export function TimelineWorkspace({
   const rowCount = Math.max(1, ...placed.map((p) => p.row + 1))
   const cardBandH = rowCount * (cardH + CARD_ROW_GAP)
 
-  const comparing = !!ws.scenario.withoutProposal && !!ws.scenario.proposal
+  /**
+   * The two cash paths to draw against each other.
+   *
+   * A proposed spend compares against the same plan without it. A payout delay
+   * compares against the plan with the payout on time — which the engine
+   * already returns for every what-if. Only the proposal case was ever drawn,
+   * so applying a delay changed the timeline without showing what it changed.
+   */
+  const baseline =
+    ws.scenario.proposal && ws.scenario.withoutProposal
+      ? ws.scenario.withoutProposal
+      : ws.scenario.payoutDelayDays !== 0
+        ? (ws.scenario.onTimePlan ?? null)
+        : null
+  const comparing = !!baseline
+  const comparingDelay = comparing && !ws.scenario.proposal
   const bandTop = 24
 
   const focusChain = ws.chains.find((c) => c.id === openChainId) ?? null
@@ -113,22 +190,34 @@ export function TimelineWorkspace({
   // One chain is open at a time, so only its side of the rail is budgeted for
   // three levels; the other needs room for a tag. That is what keeps a whole
   // chain inside the viewport instead of running off the bottom.
+  /**
+   * How far a closed chain's tag hangs from the rail.
+   *
+   * Below the rail it has to clear the date axis, and when a comparison is
+   * drawn it has to clear that too — a tag sitting on top of the very chart
+   * explaining the what-if was hiding the answer behind the question.
+   */
+  const dropFor = (dir: 1 | -1) =>
+    dir === 1
+      ? ENTRY_DROP + AXIS_LABELS_H + (comparing ? bandTop + BAND_H + 14 : 0)
+      : ENTRY_DROP
+
   const openAbove = focusChain?.direction === 'above'
   const openBelow = focusChain?.direction === 'below'
 
-  const gapAbove = clampGap(frameH / 2 - cardBandH - (compact ? 34 : 42), FIRST_ABOVE)
+  const gapAbove = clampGap(frameH / 2 - cardBandH - PILL_LANE - (compact ? 12 : 20), FIRST_ABOVE)
   const aboveNeed = openAbove
-    ? cardBandH + 18 + FIRST_ABOVE + 2 * gapAbove + nodeH / 2 + (compact ? 18 : 24)
-    : cardBandH + 18 + ENTRY_DROP + ENTRY_H + 24
+    ? PILL_LANE + cardBandH + FIRST_ABOVE + 2 * gapAbove + nodeH / 2 + (compact ? 18 : 24)
+    : PILL_LANE + cardBandH + ENTRY_DROP + ENTRY_H + 24
 
   const axisY = Math.max(Math.round(frameH / 2), Math.round(aboveNeed))
   const gapBelow = clampGap(Math.max(frameH, axisY + 190) - axisY - 42, FIRST_BELOW)
   const belowNeed = openBelow
     ? FIRST_BELOW + 2 * gapBelow + nodeH / 2 + (compact ? 26 : 34)
-    : FIRST_BELOW + ENTRY_DROP + ENTRY_H + 26
+    : FIRST_BELOW + dropFor(1) + ENTRY_H + 26
   const canvasH = Math.max(frameH, Math.round(axisY + belowNeed))
 
-  const cardTop = (row: number) => axisY - 20 - (row + 1) * (cardH + CARD_ROW_GAP)
+  const cardTop = (row: number) => axisY - PILL_LANE - (row + 1) * (cardH + CARD_ROW_GAP)
 
   const metricsFor = (dir: 1 | -1): ChainMetrics =>
     dir === 1
@@ -139,7 +228,7 @@ export function TimelineWorkspace({
     const root = ws.events.find((e) => e.id === chain.rootEventId)
     const anchorX = root ? x(root.date) : EDGE_PAD
     if (chain.direction === 'below') return { anchorX, anchorY: axisY, dir: 1 as const }
-    return { anchorX, anchorY: axisY - cardBandH - 20, dir: -1 as const }
+    return { anchorX, anchorY: axisY - PILL_LANE - cardBandH, dir: -1 as const }
   }
 
   const focusLayout = useMemo(() => {
@@ -151,6 +240,131 @@ export function TimelineWorkspace({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusChain, ws.events, axisY, cardBandH, gapAbove, gapBelow, nodeH, FIRST_BELOW])
+
+  const focused = !!focusLayout
+  const focusRootId = focusLayout?.chain.rootEventId ?? null
+
+  /** Everything the focused chain is not steps back rather than vanishing. */
+  const recede = (hidden: boolean): CSSProperties => ({
+    opacity: hidden ? 0 : 1,
+    pointerEvents: hidden ? 'none' : undefined,
+    transition: 'opacity 380ms ease',
+  })
+
+  /**
+   * The camera.
+   *
+   * Opening a chain stops being a disclosure and becomes a move: the canvas
+   * scales and slides until that chain fills the space left of the panel, and
+   * everything the chain is not fades back. The scale comes from the chain's
+   * own bounding box rather than a constant, so a tall chain and a short one
+   * both arrive framed.
+   */
+  /**
+   * Where the timeline was scrolled to when the camera took over.
+   *
+   * The camera used to zero the scroll on the way in, which threw the view to
+   * the far end of the history before the move even started — the zoom appeared
+   * to fly in from months ago. The scroll is left exactly where the owner had
+   * it and folded into the camera's own translation instead, so the move begins
+   * from the frame they were already looking at. Nothing scrolls; only the
+   * transform animates.
+   */
+  const [frozen, setFrozen] = useState<{ left: number; top: number } | null>(null)
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    if (focused && !frozen) setFrozen({ left: el.scrollLeft, top: el.scrollTop })
+    if (!focused && frozen) setFrozen(null)
+  }, [focused, frozen])
+
+  const camera = useMemo(() => {
+    // Identity until the frozen scroll is known, so the transition has exactly
+    // one leg: from the survey frame to the chain.
+    if (!focusLayout || !frozen) {
+      return { k: 1, tx: 0, ty: 0, view: null as null | { x0: number; x1: number; y0: number; y1: number } }
+    }
+    const l = focusLayout.layout
+    // The card the chain hangs from is part of the subject. Framing the strand
+    // alone pushed that card up behind the header at wider windows.
+    // The subject is the chain, the card it hangs from, and whatever the step
+    // being read points at. Stepping through a chain therefore moves the
+    // camera: the frame widens to take in the days that step is about, and
+    // closes again on a step no recorded day backs.
+    const cardBox = (p: (typeof placed)[number]) => {
+      const cx = x(p.event.date)
+      return {
+        x0: cx - CARD_W / 2,
+        x1: cx + CARD_W / 2,
+        y0: cardTop(p.row),
+        y1: cardTop(p.row) + cardH,
+      }
+    }
+    const grow = (
+      box: { x0: number; x1: number; y0: number; y1: number },
+      b: { x0: number; x1: number; y0: number; y1: number },
+    ) => ({
+      x0: Math.min(box.x0, b.x0), x1: Math.max(box.x1, b.x1),
+      y0: Math.min(box.y0, b.y0), y1: Math.max(box.y1, b.y1),
+    })
+
+    const availW = Math.max(320, frameW - panelW)
+    const availH = Math.max(240, frameH)
+    const zoomFor = (b: { x0: number; x1: number; y0: number; y1: number }) =>
+      Math.min(availW / (b.x1 - b.x0 + FOCUS_PAD * 2), availH / (b.y1 - b.y0 + FOCUS_PAD * 2))
+
+    // The chain and the card it hangs from: always the subject.
+    let base = { x0: l.minX, x1: l.maxX, y0: l.minY, y1: l.maxY }
+    const root = placed.find((p) => p.event.id === focusLayout.chain.rootEventId)
+    if (root) base = grow(base, cardBox(root))
+
+    // What the step points at, if the frame can hold it legibly.
+    let wanted = base
+    for (const p of placed) {
+      if (revealed.has(p.event.id)) wanted = grow(wanted, cardBox(p))
+    }
+
+    const fits = zoomFor(wanted) >= MIN_ZOOM
+    const box = fits ? wanted : base
+    const k = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoomFor(box)))
+    const cx = (box.x0 + box.x1) / 2
+    const cy = (box.y0 + box.y1) / 2
+
+    // Whatever the frame ends up holding at that zoom. A step may point at more
+    // days than fit; those keep their bead on the rail rather than being shrunk
+    // into an unreadable row of cards.
+    const halfW = availW / (2 * k)
+    const halfH = availH / (2 * k)
+    const view = { x0: cx - halfW, x1: cx + halfW, y0: cy - halfH, y1: cy + halfH }
+
+    // The container keeps its scroll offset, so the translation has to carry it.
+    return {
+      k,
+      tx: availW / 2 - k * cx + frozen.left,
+      ty: availH / 2 - k * cy + frozen.top,
+      view,
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusLayout, frameW, frameH, panelW, placed, cardH, axisY, revealed, x, frozen])
+
+  /**
+   * A revealed event gets a card only if the camera's frame actually holds it.
+   * A step can point at more days than fit; those keep a lit bead on the rail
+   * instead, which is honest about being part of the step without shrinking
+   * the chain to fit them all.
+   */
+  const inFrame = (row: number, date: string) => {
+    const v = camera.view
+    if (!v) return true
+    const cx = x(date)
+    return (
+      cx - CARD_W / 2 >= v.x0 && cx + CARD_W / 2 <= v.x1 &&
+      cardTop(row) >= v.y0 && cardTop(row) + cardH <= v.y1
+    )
+  }
+  const showsCard = (id: string, row: number, date: string) =>
+    chainRoots.has(id) || (revealed.has(id) && inFrame(row, date))
+
 
   useEffect(() => {
     if (didCenter.current || !scrollRef.current) return
@@ -167,11 +381,7 @@ export function TimelineWorkspace({
     if (comparing) {
       el.scrollTo({ top: Math.max(0, axisY - RAIL_H - 52), behavior: 'smooth' })
     }
-    if (focusLayout) {
-      const visible = Math.max(240, el.clientWidth - rightInset)
-      const centre = (focusLayout.layout.minX + focusLayout.layout.maxX) / 2
-      el.scrollTo({ left: Math.max(0, centre - visible / 2), behavior: 'smooth' })
-    }
+    // A focused chain is framed by the camera, not by scrolling.
   }, [comparing, axisY, focusLayout, rightInset])
 
   const todayX = x(ws.today)
@@ -196,7 +406,6 @@ export function TimelineWorkspace({
   }, [ws.windowStart, totalDays])
 
 
-  const chainRoots = new Set(ws.chains.map((c) => c.rootEventId))
   const railEnd = canvasW - EDGE_PAD + 44
 
   const inWindow = (d?: string) => !!d && d >= ws.windowStart && d <= ws.windowEnd
@@ -209,12 +418,20 @@ export function TimelineWorkspace({
     <div ref={frameRef} className="relative h-full min-h-0">
       <div
         ref={scrollRef}
-        className="scrollbar-thin h-full overflow-auto"
+        className={`h-full ${focused ? 'overflow-hidden' : 'scrollbar-thin overflow-auto'}`}
         role="region"
         aria-label="Financial timeline. Use Tab to move between events and chains."
         tabIndex={0}
       >
         <div className="relative" style={{ width: canvasW, height: canvasH }}>
+         <div
+          className="absolute inset-0"
+          style={{
+            transformOrigin: '0 0',
+            transform: `translate(${camera.tx}px, ${camera.ty}px) scale(${camera.k})`,
+            transition: 'transform 620ms cubic-bezier(0.22, 0.61, 0.36, 1)',
+          }}
+         >
           <svg className="pointer-events-none absolute inset-0" width={canvasW} height={canvasH} aria-hidden>
             <defs>
               <linearGradient id="railRecorded" x1="0" y1="0" x2="0" y2="1">
@@ -236,6 +453,12 @@ export function TimelineWorkspace({
               </filter>
             </defs>
 
+            <g
+              style={{
+                opacity: focused ? CONTEXT_DIM : 1,
+                transition: 'opacity 380ms ease',
+              }}
+            >
             {/* week rules, behind everything */}
             {weeks.map((iso) => (
               <line key={`wk-${iso}`} x1={x(iso)} y1={18} x2={x(iso)} y2={canvasH - 18}
@@ -277,24 +500,36 @@ export function TimelineWorkspace({
             {lowMark != null && (
               <g>
                 <line x1={lowMark} y1={axisY - RAIL_H / 2 - 16} x2={lowMark} y2={axisY - RAIL_H / 2}
-                  stroke={ws.scenario.breachesReserve ? '#a35b2a' : '#15803d'} strokeWidth={1.6} />
+                  stroke={ws.scenario.breachesReserve ? '#ad4318' : '#15803d'} strokeWidth={1.6} />
                 <circle cx={lowMark} cy={axisY} r={4.6} fill="#fff"
-                  stroke={ws.scenario.breachesReserve ? '#a35b2a' : '#15803d'} strokeWidth={2.4} />
+                  stroke={ws.scenario.breachesReserve ? '#ad4318' : '#15803d'} strokeWidth={2.4} />
               </g>
             )}
             {breachMark != null && breachMark !== lowMark && (
               <g>
                 <line x1={breachMark} y1={axisY - RAIL_H / 2 - 16} x2={breachMark}
-                  y2={axisY - RAIL_H / 2} stroke="#a35b2a" strokeWidth={1.6}
+                  y2={axisY - RAIL_H / 2} stroke="#ad4318" strokeWidth={1.6}
                   strokeDasharray="3 3" />
-                <circle cx={breachMark} cy={axisY} r={4.2} fill="#fff" stroke="#a35b2a" strokeWidth={2.2} />
+                <circle cx={breachMark} cy={axisY} r={4.2} fill="#fff" stroke="#ad4318" strokeWidth={2.2} />
               </g>
             )}
 
-            {placed.map(({ event, row }) => {
+            </g>
+
+            {/* A stem joins a card to the rail. An event showing only its bead
+                has nothing at the top of one, so it gets none: the stems were
+                hanging off empty space above every marker. */}
+            {placed.filter(({ event, row }) => showsCard(event.id, row, event.date))
+              .map(({ event, row }) => {
               const hot = event.id === selectedEventId
               return (
-                <g key={`stem-${event.id}`}>
+                <g key={`stem-${event.id}`}
+                  style={{
+                    opacity:
+                      focused && event.id !== focusRootId && !revealed.has(event.id) ? 0 : 1,
+                    transition: 'opacity 380ms ease',
+                  }}
+                >
                   <line x1={x(event.date)} y1={cardTop(row) + cardH} x2={x(event.date)}
                     y2={axisY - RAIL_H / 2} stroke={hot ? 'var(--color-flow)' : '#b9c4d6'}
                     strokeWidth={hot ? 1.6 : 1.1} />
@@ -306,25 +541,42 @@ export function TimelineWorkspace({
             })}
 
             {comparing && (
-              <CashComparison scenario={ws.scenario} x={x} top={axisY + RAIL_H / 2 + bandTop} />
+              <CashComparison
+                scenario={ws.scenario}
+                baseline={baseline}
+                delay={comparingDelay}
+                x={x}
+                top={axisY + RAIL_H / 2 + bandTop}
+              />
             )}
 
             {/* stubs of chain marking where a closed chain hangs */}
             {ws.chains.filter((c) => c.id !== openChainId).map((c) => {
               const { anchorX, dir } = anchorFor(c)
-              const from = dir === 1 ? axisY : axisY - cardBandH - 18
+              const from = dir === 1 ? axisY : axisY - PILL_LANE - cardBandH
               return (
                 <line key={`stub-${c.id}`} x1={anchorX} y1={from} x2={anchorX}
-                  y2={from + dir * ENTRY_DROP} stroke="#b9a48c" strokeWidth={2.4}
-                  strokeDasharray="1.4 5.5" strokeLinecap="round" opacity={0.9} />
+                  y2={from + dir * dropFor(dir)} stroke="#b9a48c" strokeWidth={2.4}
+                  strokeDasharray="1.4 5.5" strokeLinecap="round"
+                  style={{ opacity: focused ? 0 : 0.9, transition: 'opacity 380ms ease' }} />
               )
             })}
 
             {focusLayout && <ChainStrand layout={focusLayout.layout} />}
           </svg>
 
+          {ws.briefing.highlight && (
+            <InsightBand
+              highlight={ws.briefing.highlight}
+              x={x}
+              railY={axisY}
+              railH={RAIL_H}
+              onOpen={onOpenInsight}
+            />
+          )}
+
           <div className="absolute z-20 -translate-x-1/2 rounded-full border border-[#c8d9f7] bg-white px-3 py-1 shadow-sm"
-            style={{ left: todayX, top: axisY - RAIL_H / 2 - 28 }}>
+            style={{ left: todayX, top: axisY - RAIL_H / 2 - PILL_DROP, ...recede(focused) }}>
             <span className="tnum whitespace-nowrap text-[11px] font-semibold text-[#26457f]">
               Today · {usd(ws.scenario.baselineBalanceCents)}
             </span>
@@ -335,56 +587,69 @@ export function TimelineWorkspace({
               className="tnum absolute z-20 -translate-x-1/2 whitespace-nowrap rounded-full border bg-white px-2.5 py-1 text-[10.5px] font-semibold shadow-sm"
               style={{
                 left: lowMark,
-                top: axisY - RAIL_H / 2 - 28,
-                borderColor: ws.scenario.breachesReserve ? '#e6c7ae' : '#c2e2ce',
-                color: ws.scenario.breachesReserve ? '#8a4a1f' : '#1f5c3c',
+                top: axisY - RAIL_H / 2 - PILL_DROP,
+                borderColor: ws.scenario.breachesReserve ? '#ebc3ae' : '#c2e2ce',
+                color: ws.scenario.breachesReserve ? '#8f3612' : '#1f5c3c',
+                ...recede(focused),
               }}
             >
               Lowest {usd(ws.scenario.lowestCents)}
             </span>
           )}
 
-          {placed.map(({ event, row }) => (
-            <EventCard key={event.id} event={event} x={x(event.date)} y={cardTop(row)} h={cardH}
-              hasChain={chainRoots.has(event.id)} highlighted={false}
-              muted={!event.affectsCash && !chainRoots.has(event.id)}
-              selected={selectedEventId === event.id} onSelect={onSelectEvent} />
-          ))}
+          {placed.map(({ event, row }) =>
+            showsCard(event.id, row, event.date) ? (
+              <EventCard key={event.id} event={event} x={x(event.date)} y={cardTop(row)} h={cardH}
+                hasChain={chainRoots.has(event.id)}
+                highlighted={revealed.has(event.id)}
+                muted={!event.affectsCash && !chainRoots.has(event.id)}
+                dimmed={focused && event.id !== focusRootId && !revealed.has(event.id)}
+                selected={selectedEventId === event.id} onSelect={onSelectEvent} />
+            ) : (
+              /* everything else: a bead on the rail, readable on demand */
+              <EventMarker key={event.id} event={event} x={x(event.date)} railY={axisY}
+                cardY={cardTop(row)} cardH={cardH}
+                dimmed={focused && !revealed.has(event.id)}
+                selected={selectedEventId === event.id} onSelect={onSelectEvent} />
+            ),
+          )}
 
           {/* closed chains: one tag each */}
           {ws.chains.filter((c) => c.id !== openChainId).map((c) => {
             const { anchorX, dir } = anchorFor(c)
-            const from = dir === 1 ? axisY : axisY - cardBandH - 18
+            const from = dir === 1 ? axisY : axisY - PILL_LANE - cardBandH
             return (
-              <ChainEntry key={c.id} chain={c} x={anchorX} y={from + dir * ENTRY_DROP}
-                dir={dir} active={false} onOpen={onToggleChain} />
+              <ChainEntry key={c.id} chain={c} x={anchorX} y={from + dir * dropFor(dir)}
+                dir={dir} active={false} dimmed={focused} onOpen={onToggleChain} />
             )
           })}
 
           {/* the open chain, with a way to put it away again */}
           {focusLayout && (
             <div>
-              <button
-                type="button"
-                onClick={() => onToggleChain(focusLayout.chain.id)}
-                className="absolute z-10 -translate-x-1/2 whitespace-nowrap rounded-full border border-[#c8d9f7] bg-[#eef4ff] px-3 py-[4px] text-[11px] font-medium text-[#26457f]"
-                style={{
-                  left: (focusLayout.layout.minX + focusLayout.layout.maxX) / 2,
-                  top: focusLayout.chain.direction === 'below'
-                    ? focusLayout.layout.maxY + 10
-                    : Math.max(2, focusLayout.layout.minY - 26),
-                }}
-              >
-                {focusLayout.chain.title} · close
-              </button>
               {focusLayout.layout.levels.map((lv) => (
                 <ChainNodeCard key={lv.node.id} node={lv.node} x={lv.nodeX} y={lv.y} h={nodeH}
                   selected={selectedNodeId === lv.node.id} onSelect={onSelectNode} />
               ))}
             </div>
           )}
+         </div>
         </div>
       </div>
+
+      {/* The way out sits outside the transform layer, so it holds the same
+          corner whatever the camera is doing. Chasing the bottom of a chain
+          that moves on every step is not where a way out belongs. */}
+      {focusLayout && (
+        <button
+          type="button"
+          onClick={() => onToggleChain(focusLayout.chain.id)}
+          className="deck-in absolute left-4 top-4 z-40 flex items-center gap-1.5 rounded-full border border-[#c8d9f7] bg-white/80 px-3 py-[5px] text-[11.5px] font-medium text-[#26457f] shadow-sm backdrop-blur transition-colors hover:bg-white"
+        >
+          <span aria-hidden>←</span>
+          Close {focusLayout.chain.title}
+        </button>
+      )}
     </div>
   )
 }

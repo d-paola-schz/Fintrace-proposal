@@ -3,6 +3,7 @@ import type { Claim, SourceRecord } from '../types/contracts'
 import { api } from '../lib/api'
 import { ProvenanceChip } from './Tone'
 import { longDate } from '../lib/format'
+import { SOURCE_KIND_WORD, useSourceRecord } from '../lib/sources'
 
 /** One displayed figure with its source. Clicking a citation opens the actual
  *  record — the query, the sandbox row, or the named assumption. */
@@ -25,7 +26,7 @@ export function ClaimRow({ claim }: { claim: Claim }) {
         <span className="flex shrink-0 flex-col items-end gap-1">
           <ProvenanceChip provenance={claim.provenance} />
           <span className="text-[9.5px] text-muted underline decoration-dotted">
-            {open ? 'hide source' : 'source'}
+            {open ? 'hide' : 'where from'}
           </span>
         </span>
       </button>
@@ -55,7 +56,15 @@ export function ClaimRow({ claim }: { claim: Claim }) {
   )
 }
 
+/**
+ * A citation, named rather than coded.
+ *
+ * It shows the source's written title and what kind of thing it is; the
+ * internal id stays on the element's tooltip, and the exact query appears when
+ * the record is opened, so nothing an auditor needs has been taken away.
+ */
 export function SourceLink({ id }: { id: string }) {
+  const known = useSourceRecord(id)
   const [rec, setRec] = useState<SourceRecord | null>(null)
   const [state, setState] = useState<'idle' | 'loading' | 'error'>('idle')
 
@@ -73,30 +82,54 @@ export function SourceLink({ id }: { id: string }) {
     }
   }
 
+  const name = known?.title ?? id
+  const kind = known ? SOURCE_KIND_WORD[known.kind] : undefined
+
   return (
     <>
       <button
         type="button"
         onClick={open}
-        className="rounded border border-hair bg-white px-1.5 py-[2px] font-mono text-[9.5px] text-[#3d4757] hover:border-[#c8d9f7] hover:text-[#26457f]"
+        title={`Reference ${id}`}
+        aria-expanded={!!rec}
+        className="group flex max-w-full items-center gap-1.5 rounded-full border border-hair bg-white/80 py-[5px] pl-2.5 pr-3 text-left hover:border-[#c8d9f7]"
       >
-        {state === 'loading' ? 'opening…' : id}
+        <span
+          aria-hidden
+          className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#9aa8bd] group-hover:bg-[#2f5fbe]"
+        />
+        <span className="min-w-0">
+          <span className="block truncate text-[10.5px] font-medium leading-tight text-[#3d4757] group-hover:text-[#26457f]">
+            {state === 'loading' ? 'opening…' : name}
+          </span>
+          {kind && (
+            <span className="block truncate text-[9px] uppercase tracking-[0.05em] text-muted">
+              {kind}
+            </span>
+          )}
+        </span>
       </button>
       {state === 'error' && (
-        <span className="text-[9.5px] text-[#a35b2a]">could not open {id}</span>
+        <span className="text-[9.5px] text-[#ad4318]">could not open {name}</span>
       )}
       {rec && (
-        <div className="mt-1.5 w-full rounded-md border border-hair bg-white p-2.5">
+        <div className="mt-1.5 w-full rounded-lg border border-hair bg-white p-2.5">
           <div className="flex items-start justify-between gap-2">
             <h5 className="text-[11.5px] font-semibold text-ink">{rec.title}</h5>
             <ProvenanceChip provenance={rec.provenance} />
           </div>
           {rec.origin && (
-            <p className="mt-1 font-mono text-[10px] text-muted break-all">{rec.origin}</p>
+            <>
+              <p className="mt-1.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-muted">
+                The exact query
+              </p>
+              <p className="mt-0.5 break-all font-mono text-[10px] text-muted">{rec.origin}</p>
+            </>
           )}
-          <pre className="mt-1.5 max-h-56 overflow-auto whitespace-pre-wrap text-[10.5px] leading-relaxed text-[#3d4757] scrollbar-thin">
+          <pre className="scrollbar-thin mt-1.5 max-h-56 overflow-auto whitespace-pre-wrap text-[10.5px] leading-relaxed text-[#3d4757]">
             {rec.detail}
           </pre>
+          <p className="mt-1.5 text-[9px] text-muted">Reference {rec.id}</p>
         </div>
       )}
     </>

@@ -1,11 +1,13 @@
-import type { ScenarioRequest, ScenarioResult, WorkspaceResponse } from '../types/contracts'
+import type { CashPath, ScenarioRequest, ScenarioResult, WorkspaceResponse } from '../types/contracts'
 import { shortDate, usd } from '../lib/format'
 
 export const BAND_H = 88
 
 const NOW_COLOUR = '#2563eb'
 const SPEND_COLOUR = '#7c3aed'
-const RESERVE_COLOUR = '#a35b2a'
+/** A delay is not a decision you are making, so it is not the spend colour. */
+const DELAY_COLOUR = '#ad4318'
+const RESERVE_COLOUR = '#ad4318'
 
 /**
  * Both cash paths, drawn inside the timeline on the same date axis: where the
@@ -16,20 +18,27 @@ const RESERVE_COLOUR = '#a35b2a'
  */
 export function CashComparison({
   scenario,
+  baseline,
+  delay,
   x,
   top,
 }: {
   scenario: ScenarioResult
+  /** The path to compare against: the plan without the spend, or with the
+   *  payout on time. */
+  baseline: CashPath | null
+  /** True when the what-if is a payout delay rather than a proposed spend. */
+  delay?: boolean
   /** the timeline's own date scale, so the two views line up exactly */
   x: (iso: string) => number
   top: number
 }) {
-  const without = scenario.withoutProposal
-  if (!without || !scenario.proposal) return null
+  if (!baseline) return null
 
   const withDays = scenario.days ?? []
-  const nowDays = without.days ?? []
+  const nowDays = baseline.days ?? []
   if (withDays.length === 0 || nowDays.length === 0) return null
+  const accent = delay ? DELAY_COLOUR : SPEND_COLOUR
 
   const reserve = scenario.reserveCents
   const values = [
@@ -66,8 +75,8 @@ export function CashComparison({
     <g aria-hidden>
       <defs>
         <linearGradient id="costFill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={SPEND_COLOUR} stopOpacity={0.2} />
-          <stop offset="100%" stopColor={SPEND_COLOUR} stopOpacity={0.07} />
+          <stop offset="0%" stopColor={accent} stopOpacity={0.2} />
+          <stop offset="100%" stopColor={accent} stopOpacity={0.07} />
         </linearGradient>
       </defs>
 
@@ -78,7 +87,7 @@ export function CashComparison({
           y={top}
           width={Math.max(2, x(breachDays[breachDays.length - 1].date) - x(breachDays[0].date))}
           height={BAND_H}
-          fill="#a35b2a"
+          fill="#ad4318"
           opacity={0.07}
         />
       )}
@@ -108,23 +117,37 @@ export function CashComparison({
       </text>
 
       <path d={line(nowDays)} fill="none" stroke={NOW_COLOUR} strokeWidth={2} opacity={0.55} />
-      <path d={line(withDays)} fill="none" stroke={SPEND_COLOUR} strokeWidth={2.6} />
+      <path d={line(withDays)} fill="none" stroke={accent} strokeWidth={2.6} />
 
       {/* where each path bottoms out */}
       <circle cx={x(lowNow.date)} cy={yOf(lowNow.closingCents)} r={3.4} fill="#fff"
         stroke={NOW_COLOUR} strokeWidth={2} opacity={0.75} />
       <circle cx={x(lowWith.date)} cy={yOf(lowWith.closingCents)} r={4.2} fill="#fff"
-        stroke={SPEND_COLOUR} strokeWidth={2.6} />
+        stroke={accent} strokeWidth={2.6} />
       <text
         x={x(lowWith.date)}
         y={yOf(lowWith.closingCents) + 15}
         textAnchor="middle"
         fontSize={10}
         fontWeight={600}
-        fill={SPEND_COLOUR}
+        fill={accent}
         className="tnum"
       >
         {usd(lowWith.closingCents)} {shortDate(lowWith.date)}
+      </text>
+
+      {/* The plan's own low, named too. Without it the reader sees where they
+          would end up but not what they are giving up to get there. */}
+      <text
+        x={x(lowNow.date)}
+        y={yOf(lowNow.closingCents) - 8}
+        textAnchor="middle"
+        fontSize={9.5}
+        fill={NOW_COLOUR}
+        opacity={0.8}
+        className="tnum"
+      >
+        {baseline.label} {usd(lowNow.closingCents)}
       </text>
     </g>
   )
@@ -153,7 +176,7 @@ export function CashComparisonHeadline({
   return (
     <div
       className={`border-b px-4 py-2 ${
-        breach ? 'border-[#e6c7ae] bg-[#fdf3ec]' : 'border-[#d9caec] bg-[#f9f6fd]'
+        breach ? 'border-[#ebc3ae] bg-[#fdf1ea]' : 'border-[#d9caec] bg-[#f9f6fd]'
       }`}
     >
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
@@ -171,7 +194,7 @@ export function CashComparisonHeadline({
           <span className="h-[3px] w-5 rounded" style={{ background: SPEND_COLOUR }} />
           <span className="text-[11px] text-muted">With it</span>
           <span
-            className={`tnum text-[12.5px] font-semibold ${breach ? 'text-[#8a4a1f]' : 'text-ink'}`}
+            className={`tnum text-[12.5px] font-semibold ${breach ? 'text-[#8f3612]' : 'text-ink'}`}
           >
             {usd(s.lowestCents)}
           </span>
@@ -179,7 +202,7 @@ export function CashComparisonHeadline({
 
         <span
           className={`tnum rounded px-2 py-[3px] text-[11.5px] font-semibold text-white ${
-            breach ? 'bg-[#8a4a1f]' : 'bg-[#54397e]'
+            breach ? 'bg-[#8f3612]' : 'bg-[#54397e]'
           }`}
         >
           {usd(s.deltaLowestCents)} at the tightest day
@@ -212,7 +235,7 @@ export function CashComparisonHeadline({
               title={a.tradeoff}
               className={`tnum rounded-full border px-2.5 py-[3px] text-[11px] transition-colors ${
                 a.breachesReserve
-                  ? 'border-[#e6c7ae] bg-white text-[#8a4a1f] hover:bg-[#fdf3ec]'
+                  ? 'border-[#ebc3ae] bg-white text-[#8f3612] hover:bg-[#fdf1ea]'
                   : 'border-[#c2e2ce] bg-white text-[#1f5c3c] hover:bg-[#f4fbf7]'
               }`}
             >

@@ -17,7 +17,11 @@ import (
 // grows to contain every event, so a payout pushed to the end of the delay
 // range can never fall off the edge of the timeline.
 const (
-	pastDays   = 21
+	// salesWeeks is how many recorded weeks of this seller's history are drawn
+	// behind today. They are all real recorded weeks, time-shifted like
+	// everything else; the timeline scrolls back through them.
+	salesWeeks = 12
+	pastDays   = salesWeeks * 7
 	futureDays = 14
 	// edgePadDays keeps an event off the very rim of the canvas.
 	edgePadDays = 2
@@ -130,8 +134,8 @@ func (b *Builder) salesEvents() []contracts.FinancialEvent {
 	}
 
 	var out []contracts.FinancialEvent
-	// Four complete weeks ending on the last recorded day.
-	for w := 0; w < 4; w++ {
+	// Complete weeks ending on the last recorded day, most recent first.
+	for w := 0; w < salesWeeks; w++ {
 		weekEnd := srcEnd.AddDate(0, 0, -7*w)
 		var brl int64
 		var items, orders int

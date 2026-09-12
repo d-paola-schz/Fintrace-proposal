@@ -10,8 +10,19 @@ import { ScenarioSheet } from './components/ScenarioSheet'
 import { AskSheet } from './components/AskSheet'
 import { DataSheet } from './components/DataSheet'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { SourceIndexProvider } from './lib/sources'
+import { InsightPanel } from './components/InsightPanel'
 
 const EMPTY: ScenarioRequest = { payoutDelayDays: 0, proposal: null, assumptions: null }
+
+/**
+ * Width of the description panel. The camera frames a chain in what is left,
+ * so on a narrow window the panel has to give ground or there is nothing to
+ * frame the chain in.
+ */
+function panelWidth(vw: number) {
+  return Math.round(Math.min(460, Math.max(340, vw * 0.34)))
+}
 
 type SheetKind = 'scenario' | 'ask' | 'data' | 'purchase' | null
 
@@ -25,7 +36,20 @@ export default function App() {
   const [openChainId, setOpenChainId] = useState<string | null>(null)
   const [sheet, setSheet] = useState<SheetKind>(null)
   const [askSeed, setAskSeed] = useState<string | undefined>()
+  // Whether the step now open was reached by walking backwards, so its deck
+  // knows to open on its last card rather than its first.
+  const [enteredAtEnd, setEnteredAtEnd] = useState(false)
+  const [insight, setInsight] = useState(false)
+  const [vw, setVw] = useState(() => (typeof window === 'undefined' ? 1440 : window.innerWidth))
   const seq = useRef(0)
+
+  useEffect(() => {
+    const onResize = () => setVw(window.innerWidth)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  const panelW = panelWidth(vw)
 
   const run = useCallback(async (req: ScenarioRequest) => {
     const mine = ++seq.current
@@ -61,27 +85,50 @@ export default function App() {
   }, [run])
 
   // Opening a node opens its chain; they can never disagree.
+  //
+  // Selecting is not a toggle. Once a chain holds the camera, clicking the step
+  // you are already reading used to empty the panel and leave the chain framed
+  // against nothing, which read as a misfire rather than a choice. The panel's
+  // close control and the chain's own close tag are the ways out.
   const selectNode = useCallback(
-    (id: string) => {
+    (id: string, atEnd = false) => {
+      setInsight(false)
       setEventId(null)
-      setNodeId((cur) => (cur === id ? null : id))
+      setEnteredAtEnd(atEnd)
+      setNodeId(id)
       const chain = ws?.chains.find((c) => c.nodes.some((n) => n.id === id))
       if (chain) setOpenChainId(chain.id)
     },
     [ws],
   )
 
-  const toggleChain = useCallback((id: string) => {
-    setOpenChainId((cur) => {
-      if (cur === id) {
-        setNodeId(null)
-        return null
-      }
-      return id
-    })
-  }, [])
+  // Opening a chain is now a camera move onto it, so it arrives already
+  // saying something: step 01 is selected and its description is what fills
+  // the space the rest of the timeline just gave up.
+  const toggleChain = useCallback(
+    (id: string) => {
+      setOpenChainId((cur) => {
+        if (cur === id) {
+          setNodeId(null)
+          return null
+        }
+        setEventId(null)
+        setEnteredAtEnd(false)
+        const first = ws?.chains
+          .find((c) => c.id === id)
+          ?.nodes.reduce<(typeof ws.chains)[number]['nodes'][number] | null>(
+            (best, n) => (best === null || n.sequence < best.sequence ? n : best),
+            null,
+          )
+        setNodeId(first ? first.id : null)
+        return id
+      })
+    },
+    [ws],
+  )
 
   const selectEvent = useCallback((id: string) => {
+    setInsight(false)
     setNodeId(null)
     setEventId((cur) => (cur === id ? null : id))
   }, [])
@@ -96,15 +143,12 @@ export default function App() {
   // chains are for by using one.
   const seeWhy = useCallback((a: BriefingAction) => {
     setSheet(null)
+    setEnteredAtEnd(false)
     if (a.chainId) setOpenChainId(a.chainId)
     setEventId(null)
     if (a.nodeId) setNodeId(a.nodeId)
   }, [])
 
-  const askWith = useCallback((question: string) => {
-    setAskSeed(question)
-    setSheet('ask')
-  }, [])
 
   const node = useMemo(() => {
     if (!ws || !nodeId) return null
@@ -123,15 +167,15 @@ export default function App() {
   if (error && !ws) {
     return (
       <div className="flex h-full items-center justify-center p-8">
-        <div className="max-w-md rounded-lg border border-[#e6c7ae] bg-[#fdf3ec] p-4">
-          <h1 className="text-[14px] font-semibold text-[#8a4a1f]">
+        <div className="max-w-md rounded-lg border border-[#ebc3ae] bg-[#fdf1ea] p-4">
+          <h1 className="text-[14px] font-semibold text-[#8f3612]">
             The calculation service is not responding
           </h1>
-          <p className="mt-1.5 text-[12px] leading-relaxed text-[#8a4a1f]">{error}</p>
+          <p className="mt-1.5 text-[12px] leading-relaxed text-[#8f3612]">{error}</p>
           <button
             type="button"
             onClick={() => run(scenario)}
-            className="mt-3 rounded bg-[#8a4a1f] px-3 py-1.5 text-[12px] font-medium text-white"
+            className="mt-3 rounded bg-[#8f3612] px-3 py-1.5 text-[12px] font-medium text-white"
           >
             Try again
           </button>
@@ -149,6 +193,7 @@ export default function App() {
   }
 
   return (
+    <SourceIndexProvider sources={ws.sources ?? []}>
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex shrink-0 items-center gap-3 border-b border-hair bg-white px-6 py-2">
         <span className="flex h-6 w-6 items-center justify-center rounded bg-[#1b2b4b] text-[12px] font-bold text-white">
@@ -165,32 +210,41 @@ export default function App() {
           {busy && <span className="text-[11.5px] italic text-muted">recomputing…</span>}
           <button
             type="button"
+            onClick={() => setSheet('ask')}
+            className="rounded-md border border-hair px-3 py-1.5 text-[12px] text-[#3d4757] hover:border-[#c8d9f7]"
+          >
+            Ask a question
+          </button>
+          <button
+            type="button"
+            onClick={() => setSheet('purchase')}
+            className="rounded-md border border-[#c8d9f7] bg-[#eef4ff] px-3 py-1.5 text-[12px] font-semibold text-[#26457f] hover:bg-[#e3edff]"
+          >
+            Check a purchase
+          </button>
+          <button
+            type="button"
             onClick={() => setSheet('scenario')}
-            className="rounded-md border border-hair px-2.5 py-1 text-[11.5px] text-[#3d4757] hover:border-[#c8d9f7]"
+            className="rounded-md border border-hair px-3 py-1.5 text-[12px] text-[#3d4757] hover:border-[#c8d9f7]"
           >
             Try a scenario
           </button>
           <button
             type="button"
             onClick={() => setSheet('data')}
-            className="rounded-md border border-hair px-2.5 py-1 text-[11.5px] text-[#3d4757] hover:border-[#c8d9f7]"
+            className="rounded-md border border-hair px-3 py-1.5 text-[12px] text-[#3d4757] hover:border-[#c8d9f7]"
           >
             Data &amp; assumptions
           </button>
         </div>
       </header>
 
-      <BriefingBar
-        briefing={ws.briefing}
-        busy={busy}
-        onSeeWhy={seeWhy}
-        onCheckPurchase={() => setSheet('purchase')}
-        onAsk={askWith}
-        onReset={reset}
-      />
+      {/* Only the what-if strip remains above the timeline. The opening reading
+          moved onto the rail itself, where the days it concerns actually are. */}
+      <BriefingBar briefing={ws.briefing} onReset={reset} />
 
       {error && (
-        <p className="shrink-0 bg-[#fdf3ec] px-6 py-1.5 text-[11.5px] text-[#8a4a1f]">{error}</p>
+        <p className="shrink-0 bg-[#fdf1ea] px-6 py-1.5 text-[11.5px] text-[#8f3612]">{error}</p>
       )}
 
       <main className="relative min-h-0 flex-1">
@@ -203,7 +257,9 @@ export default function App() {
             onSelectNode={selectNode}
             onSelectEvent={selectEvent}
             onToggleChain={toggleChain}
-            rightInset={node || event ? 430 : 0}
+            onOpenInsight={() => setInsight(true)}
+            rightInset={node || event || insight ? panelW : 0}
+            panelW={node || insight ? panelW : 0}
           />
         </ErrorBoundary>
 
@@ -211,6 +267,8 @@ export default function App() {
           <ErrorBoundary area="The detail panel">
             <NodeDrawer
               ws={ws}
+              width={panelW}
+              startAtEnd={enteredAtEnd}
               node={node}
               scenario={scenario}
               onApplyScenario={applyScenario}
@@ -220,9 +278,24 @@ export default function App() {
           </ErrorBoundary>
         )}
 
+        {insight && !node && !event && (
+          <ErrorBoundary area="The reading">
+            <InsightPanel
+              ws={ws}
+              width={panelW}
+              scenario={scenario}
+              onSeeWhy={(a) => {
+                setInsight(false)
+                seeWhy(a)
+              }}
+              onClose={() => setInsight(false)}
+            />
+          </ErrorBoundary>
+        )}
+
         {event && !node && (
           <ErrorBoundary area="The detail panel">
-            <EventDrawer event={event} onClose={closeDetail} />
+            <EventDrawer event={event} width={panelW} onClose={closeDetail} />
           </ErrorBoundary>
         )}
 
@@ -265,5 +338,6 @@ export default function App() {
         {sheet === 'data' && <DataSheet ws={ws} onClose={() => setSheet(null)} />}
       </main>
     </div>
+    </SourceIndexProvider>
   )
 }

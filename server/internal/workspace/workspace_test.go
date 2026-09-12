@@ -598,3 +598,227 @@ func TestRemovingEveryModelledPaymentStillProjects(t *testing.T) {
 		t.Error("with no outflows at all the reserve cannot be breached")
 	}
 }
+
+// A step may point the timeline at days, but only at days the timeline has.
+// The interface brings these events back on screen while a step is being read,
+// so a dangling id would either highlight nothing or highlight the wrong day.
+func TestEveryHighlightedEventExists(t *testing.T) {
+	b := testBuilder(t)
+	ws := b.Build(contracts.ScenarioRequest{})
+
+	known := map[string]bool{}
+	for _, e := range ws.Events {
+		known[e.ID] = true
+	}
+
+	for _, c := range ws.Chains {
+		for _, n := range c.Nodes {
+			if n.HighlightEventIDs == nil {
+				t.Errorf("%s: highlightEventIds is nil; Sanitize must make it an array", n.ID)
+			}
+			for _, id := range n.HighlightEventIDs {
+				if !known[id] {
+					t.Errorf("%s highlights %q, which is not an event in the payload", n.ID, id)
+				}
+			}
+		}
+	}
+}
+
+// The highlight is a pointer at existing events, never a new claim. If a step
+// names a figure the timeline cannot show, that is a missing input and has to
+// stay stated as one — so the reorder step, whose whole subject is a number the
+// records do not contain, points at nothing.
+func TestTheStepWithNoRecordedBasisHighlightsNothing(t *testing.T) {
+	b := testBuilder(t)
+	ws := b.Build(contracts.ScenarioRequest{})
+
+	for _, c := range ws.Chains {
+		for _, n := range c.Nodes {
+			if n.ID != "node-sales-3" {
+				continue
+			}
+			if len(n.HighlightEventIDs) != 0 {
+				t.Errorf("%s highlights %v; units on hand are not in the records, so no day backs this step",
+					n.ID, n.HighlightEventIDs)
+			}
+			return
+		}
+	}
+	t.Fatal("node-sales-3 not found")
+}
+
+// The delay step blames one outflow. Which one depends on what the engine
+// found, and the highlight has to follow that finding rather than a constant.
+func TestTheDelayStepHighlightsTheOutflowTheEngineBlamed(t *testing.T) {
+	b := testBuilder(t)
+	ws := b.Build(contracts.ScenarioRequest{})
+
+	var n contracts.ChainNode
+	for _, c := range ws.Chains {
+		for _, x := range c.Nodes {
+			if x.ID == "node-payout-2" {
+				n = x
+			}
+		}
+	}
+	if n.ID == "" {
+		t.Fatal("node-payout-2 not found")
+	}
+
+	has := func(id string) bool {
+		for _, h := range n.HighlightEventIDs {
+			if h == id {
+				return true
+			}
+		}
+		return false
+	}
+	if !has("evt-payout") {
+		t.Errorf("the delay step must always point at the payout; got %v", n.HighlightEventIDs)
+	}
+	bp := ws.Scenario.DelayBreakpoint
+	switch {
+	case bp.Found && bp.DelayDays == 0:
+		if !has("evt-asm-supplier") {
+			t.Errorf("breach with no delay should point at the commitment causing it; got %v", n.HighlightEventIDs)
+		}
+	case bp.Found:
+		if !has("evt-asm-rent") {
+			t.Errorf("a delay breach should point at the outflow named in the explanation; got %v", n.HighlightEventIDs)
+		}
+	default:
+		if len(n.HighlightEventIDs) != 1 {
+			t.Errorf("no breach found, so only the payout should be pointed at; got %v", n.HighlightEventIDs)
+		}
+	}
+}
+
+// The timeline carries several months of recorded weeks so it can be scrolled
+// back through. The sales chain's figures are still measured over the 30-day
+// window, so its highlight must not spread across the whole history: a step
+// that lit up twelve weeks while quoting a 30-day total would be claiming its
+// numbers cover ground they do not.
+func TestTheSalesHighlightStaysInsideItsWindow(t *testing.T) {
+	b := testBuilder(t)
+	ws := b.Build(contracts.ScenarioRequest{})
+
+	byID := map[string]contracts.FinancialEvent{}
+	sales := 0
+	for _, e := range ws.Events {
+		byID[e.ID] = e
+		if e.Kind == "sales" {
+			sales++
+		}
+	}
+	if sales <= windowWeeks {
+		t.Fatalf("expected more recorded weeks than the window covers, got %d", sales)
+	}
+
+	for _, c := range ws.Chains {
+		for _, n := range c.Nodes {
+			if n.ChainID != "chain-sales" || len(n.HighlightEventIDs) == 0 {
+				continue
+			}
+			if len(n.HighlightEventIDs) > windowWeeks {
+				t.Errorf("%s highlights %d weeks; the window covers %d",
+					n.ID, len(n.HighlightEventIDs), windowWeeks)
+			}
+			for _, id := range n.HighlightEventIDs {
+				if byID[id].Kind != "sales" {
+					t.Errorf("%s highlights %q, which is not a recorded sales week", n.ID, id)
+				}
+			}
+		}
+	}
+}
+
+// Scrolling further back must not change a single number. The extra weeks are
+// recorded item sales, which never move the bank balance, so the projection,
+// the lowest point and the reserve verdict are exactly as they were.
+func TestExtraHistoryDoesNotMoveTheProjection(t *testing.T) {
+	b := testBuilder(t)
+	ws := b.Build(contracts.ScenarioRequest{})
+
+	for _, e := range ws.Events {
+		if e.Kind == "sales" && e.AffectsCash {
+			t.Fatalf("%s is recorded revenue and must not affect cash", e.ID)
+		}
+	}
+
+	// Every day of the projection is built only from cash events.
+	for _, d := range ws.Scenario.Days {
+		for _, id := range d.EventIDs {
+			for _, e := range ws.Events {
+				if e.ID == id && !e.AffectsCash {
+					t.Errorf("projection day %s counts %s, which does not affect cash", d.Date, id)
+				}
+			}
+		}
+	}
+}
+
+// The band drawn on the timeline must cover days the projection actually has,
+// and must never claim a level the engine's own findings do not support.
+func TestTheBriefingHighlightIsGroundedInTheProjection(t *testing.T) {
+	b := testBuilder(t)
+	ws := b.Build(contracts.ScenarioRequest{})
+
+	h := ws.Briefing.Highlight
+	if h == nil {
+		t.Fatal("no highlight on the briefing")
+	}
+	if h.StartDate != ws.Scenario.StartDate {
+		t.Errorf("band starts %s, projection starts %s", h.StartDate, ws.Scenario.StartDate)
+	}
+	if h.EndDate < h.StartDate {
+		t.Errorf("band ends %s before it starts %s", h.EndDate, h.StartDate)
+	}
+	if h.EndDate < ws.Scenario.LowestDate {
+		t.Errorf("band ends %s, before the low on %s", h.EndDate, ws.Scenario.LowestDate)
+	}
+	if ws.Scenario.FirstBreachDate != "" && h.EndDate < ws.Scenario.FirstBreachDate {
+		t.Errorf("band ends %s, before the breach on %s", h.EndDate, ws.Scenario.FirstBreachDate)
+	}
+	if h.StartDate < ws.WindowStart || h.EndDate > ws.WindowEnd {
+		t.Errorf("band %s..%s falls outside the window %s..%s",
+			h.StartDate, h.EndDate, ws.WindowStart, ws.WindowEnd)
+	}
+
+	switch h.Level {
+	case "risk":
+		if !ws.Scenario.BreachesReserve {
+			t.Error(`level "risk" but the plan does not breach the reserve`)
+		}
+	case "watch":
+		if ws.Scenario.BreachesReserve {
+			t.Error(`level "watch" but the plan already breaches the reserve`)
+		}
+		if !ws.Scenario.DelayBreakpoint.Found {
+			t.Error(`level "watch" but the engine found no delay that breaches`)
+		}
+	case "good":
+		if ws.Scenario.BreachesReserve {
+			t.Error(`level "good" but the plan breaches the reserve`)
+		}
+	default:
+		t.Errorf("unknown level %q", h.Level)
+	}
+}
+
+// A breaching plan must read as a risk, not as something to keep an eye on.
+func TestABreachingPlanAlwaysReadsAsRisk(t *testing.T) {
+	b := testBuilder(t)
+	ws := b.Build(contracts.ScenarioRequest{
+		Proposal: &contracts.ProposedDecision{
+			Description: "Inventory", Category: "inventory",
+			Date: b.offset(3), AmountCents: 9_000_00,
+		},
+	})
+	if !ws.Scenario.BreachesReserve {
+		t.Fatal("expected this proposal to breach the reserve")
+	}
+	if ws.Briefing.Highlight == nil || ws.Briefing.Highlight.Level != "risk" {
+		t.Errorf("breaching plan should read as risk, got %+v", ws.Briefing.Highlight)
+	}
+}

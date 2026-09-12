@@ -131,6 +131,15 @@ type ChainNode struct {
 	Chart           *ChartSpec       `json:"chart,omitempty"`
 	ResponseOptions []ResponseOption `json:"responseOptions"`
 	SuggestedAsks   []string         `json:"suggestedAsks,omitempty"`
+
+	// HighlightEventIDs are the dated events this step is actually talking
+	// about, named by the rule that wrote the step. The interface brings just
+	// these back onto the timeline while the step is being read, so the owner
+	// can see which days a sentence refers to.
+	//
+	// This adds no figure and no claim. Every id here must already be an event
+	// in the same payload; a test enforces that.
+	HighlightEventIDs []string `json:"highlightEventIds"`
 }
 
 // ChainSegment is the strand between two consecutive levels. Segments carry
@@ -396,6 +405,26 @@ type Briefing struct {
 	// ScenarioLabel is set only while a what-if is being shown.
 	ScenarioLabel string          `json:"scenarioLabel,omitempty"`
 	SeeWhy        *BriefingAction `json:"seeWhy,omitempty"`
+	// Highlight marks the stretch of the timeline this briefing is about, so
+	// the interface can say it on the timeline itself rather than in a
+	// paragraph above it.
+	Highlight *BriefingHighlight `json:"highlight,omitempty"`
+}
+
+// BriefingHighlight is the span of days the opening insight concerns, and how
+// that span reads.
+//
+// Level is not a restatement of Status. Status answers "does the modelled plan
+// breach the reserve"; Level adds the middle case the owner actually cares
+// about — the plan holds, but a delay inside the tested range would break it.
+// Both come from the engine; neither is a judgement written by hand.
+type BriefingHighlight struct {
+	// Level is good | watch | risk.
+	Level     string `json:"level"`
+	StartDate string `json:"startDate"`
+	EndDate   string `json:"endDate"`
+	// Summary is one line, for a reader who has only hovered.
+	Summary string `json:"summary"`
 }
 
 // Outlook is the first thing the owner reads: where the plan stands, and
@@ -620,6 +649,7 @@ func (w *WorkspaceResponse) Sanitize() {
 			n.AssumptionRefs = nonNil(n.AssumptionRefs)
 			n.ResponseOptions = nonNil(n.ResponseOptions)
 			n.SuggestedAsks = nonNil(n.SuggestedAsks)
+			n.HighlightEventIDs = nonNil(n.HighlightEventIDs)
 			n.Chart = sanitizeChart(n.Chart)
 		}
 	}

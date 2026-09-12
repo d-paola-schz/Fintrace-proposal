@@ -4,8 +4,8 @@ import { SourceLink } from './ClaimRow'
 import { ProvenanceChip } from './Tone'
 
 const STATE_COLOUR: Record<string, string> = {
-  live: '#15803d', configured: '#9a7412', snapshot: '#9a7412',
-  fixture: '#9a7412', unavailable: '#a35b2a',
+  live: '#15803d', configured: '#b3860a', snapshot: '#b3860a',
+  fixture: '#b3860a', unavailable: '#ad4318',
 }
 const STATE_WORD: Record<string, string> = {
   live: 'live', configured: 'unverified', snapshot: 'snapshot',
@@ -32,7 +32,7 @@ export function DataSheet({ ws, onClose }: { ws: WorkspaceResponse; onClose: () 
             <p className="flex items-center gap-1.5 text-[11.5px] font-semibold uppercase tracking-[0.06em] text-ink">
               <span
                 className="h-[7px] w-[7px] shrink-0 rounded-full"
-                style={{ background: STATE_COLOUR[s.state] ?? '#9a7412' }}
+                style={{ background: STATE_COLOUR[s.state] ?? '#b3860a' }}
               />
               {s.name} · {STATE_WORD[s.state] ?? s.state}
             </p>

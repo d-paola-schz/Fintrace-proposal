@@ -6,10 +6,10 @@ export const CARD_H = 50
 /** Card height when vertical room is tight. */
 export const CARD_H_COMPACT = 42
 
-const KIND_ACCENT: Record<string, string> = {
+export const KIND_ACCENT: Record<string, string> = {
   sales: '#2563eb',
-  payout: '#9a7412',
-  supplier_payment: '#a35b2a',
+  payout: '#b3860a',
+  supplier_payment: '#ad4318',
   ad_spend: '#7c5cbf',
   bill: '#5a6675',
   proposal: '#0f766e',
@@ -27,6 +27,7 @@ export function EventCard({
   highlighted,
   selected,
   muted,
+  dimmed,
   onSelect,
 }: {
   event: FinancialEvent
@@ -38,6 +39,8 @@ export function EventCard({
   selected: boolean
   /** Repeated, non-cash markers recede so the money events lead the eye. */
   muted?: boolean
+  /** Out of frame while a chain holds the camera. */
+  dimmed?: boolean
   onSelect: (id: string) => void
 }) {
   const accent = KIND_ACCENT[event.kind] ?? '#5a6675'
@@ -64,6 +67,9 @@ export function EventCard({
         top: y,
         width: CARD_W,
         height: h,
+        opacity: dimmed ? 0 : 1,
+        pointerEvents: dimmed ? 'none' : undefined,
+        transition: 'opacity 380ms ease',
         borderLeft: `3px solid ${accent}`,
         borderStyle: projected ? 'dashed solid solid dashed' : undefined,
         borderLeftStyle: 'solid',

@@ -47,7 +47,7 @@ export function Discoveries({ scenario }: { scenario: ScenarioRequest }) {
       </button>
 
       {error && (
-        <p className="mt-2 rounded border border-[#e6c7ae] bg-[#fdf3ec] px-2 py-1.5 text-[11px] text-[#8a4a1f]">
+        <p className="mt-2 rounded border border-[#ebc3ae] bg-[#fdf1ea] px-2 py-1.5 text-[11px] text-[#8f3612]">
           {error}
         </p>
       )}
@@ -99,7 +99,7 @@ export function Discoveries({ scenario }: { scenario: ScenarioRequest }) {
               <p className="mt-1 text-[11px] leading-snug text-[#3d4757]">{d.rationale}</p>
 
               {d.status === 'rejected' ? (
-                <p className="mt-1.5 rounded bg-white px-2 py-1 text-[10.5px] leading-snug text-[#8a4a1f]">
+                <p className="mt-1.5 rounded bg-white px-2 py-1 text-[10.5px] leading-snug text-[#8f3612]">
                   Engine check failed: {d.rejectedBecause}
                 </p>
               ) : (

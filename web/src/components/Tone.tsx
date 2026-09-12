@@ -3,20 +3,24 @@ import { PROVENANCE_LABEL, TONE_WORD } from '../lib/format'
 
 // Every tone carries a colour, a word and a mark. Colour is never the only
 // thing distinguishing one state from another.
+// The three strokes used to sit 18 degrees of hue apart, which is not enough
+// to tell bronze from gold in a chip the size of a fingernail. Risk is pulled
+// towards red and opportunity towards yellow, so the hues now read 15, 44 and
+// 218: three obviously different things rather than two browns and a grey.
 export const TONE_STYLE: Record<Tone, {
   stroke: string; fill: string; text: string; border: string; chip: string
 }> = {
   risk: {
-    stroke: '#a35b2a', fill: 'var(--color-bronze-soft)', text: 'text-[#8a4a1f]',
-    border: 'border-[#e6c7ae]', chip: 'bg-[#fdf3ec] text-[#8a4a1f] border-[#e6c7ae]',
+    stroke: '#ad4318', fill: 'var(--color-bronze-soft)', text: 'text-[#8f3612]',
+    border: 'border-[#ebc3ae]', chip: 'bg-[#fdf1ea] text-[#8f3612] border-[#ebc3ae]',
   },
   review: {
-    stroke: '#64748b', fill: 'var(--color-silver-soft)', text: 'text-[#4a5566]',
-    border: 'border-[#cbd3de]', chip: 'bg-[#f3f5f8] text-[#4a5566] border-[#cbd3de]',
+    stroke: '#5d6e8c', fill: 'var(--color-silver-soft)', text: 'text-[#46536b]',
+    border: 'border-[#c7d0de]', chip: 'bg-[#f2f4f9] text-[#46536b] border-[#c7d0de]',
   },
   opportunity: {
-    stroke: '#9a7412', fill: 'var(--color-gold-soft)', text: 'text-[#7d5e0d]',
-    border: 'border-[#e3d19a]', chip: 'bg-[#fdf8e9] text-[#7d5e0d] border-[#e3d19a]',
+    stroke: '#b3860a', fill: 'var(--color-gold-soft)', text: 'text-[#7f5f06]',
+    border: 'border-[#e8d296]', chip: 'bg-[#fdf7e4] text-[#7f5f06] border-[#e8d296]',
   },
 }
 
@@ -60,9 +64,9 @@ export function ToneChip({ tone, children }: { tone: Tone; children?: React.Reac
 const PROV_CLASS: Record<Provenance, string> = {
   olist_historical: 'bg-[#eef4ff] text-[#26457f] border-[#c8d9f7]',
   nessie_sandbox: 'bg-[#edf7f1] text-[#1f5c3c] border-[#c2e2ce]',
-  derived: 'bg-[#f3f5f8] text-[#4a5566] border-[#cbd3de]',
+  derived: 'bg-[#f2f4f9] text-[#46536b] border-[#c7d0de]',
   user_entered: 'bg-[#f5f0fb] text-[#54397e] border-[#d9caec]',
-  demo_assumption: 'bg-[#fdf8e9] text-[#7d5e0d] border-[#e3d19a]',
+  demo_assumption: 'bg-[#fdf7e4] text-[#7f5f06] border-[#e8d296]',
 }
 
 /** The source badge. No financial figure appears anywhere without one. */
