@@ -69,10 +69,10 @@ export function ContextChart({ spec }: { spec: ChartSpec }) {
               />
               {threshold != null && (
                 <ReferenceLine
-                  y={threshold} stroke="#a35b2a" strokeDasharray="4 4" strokeWidth={1.5}
+                  y={threshold} stroke="#ad4318" strokeDasharray="4 4" strokeWidth={1.5}
                   label={{
                     value: `Reserve ${usd(spec.thresholdCents!)}`,
-                    position: 'insideBottomLeft', fontSize: 9.5, fill: '#8a4a1f',
+                    position: 'insideBottomLeft', fontSize: 9.5, fill: '#8f3612',
                   }}
                 />
               )}
@@ -96,7 +96,7 @@ export function ContextChart({ spec }: { spec: ChartSpec }) {
                 formatter={(v) => [usd(Math.round(Number(v) * 100)), 'Item sales']}
                 contentStyle={{ fontSize: 11, borderRadius: 6, border: '1px solid #e3e8ef' }}
               />
-              <Bar dataKey="value" fill="#9a7412" radius={[3, 3, 0, 0]} isAnimationActive={false} />
+              <Bar dataKey="value" fill="#b3860a" radius={[3, 3, 0, 0]} isAnimationActive={false} />
             </BarChart>
           )}
         </ResponsiveContainer>

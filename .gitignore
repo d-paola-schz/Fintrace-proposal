@@ -5,6 +5,7 @@
 *.pem
 *.key
 
+
 # --- Dependencies ------------------------------------------------------------
 node_modules/
 .venv/
@@ -19,6 +20,7 @@ build/
 server/webdist/
 preflight-bin
 *.exe
+*.exe~
 *.so
 *.dylib
 *.test

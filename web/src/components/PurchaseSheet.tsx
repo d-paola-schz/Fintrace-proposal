@@ -66,13 +66,13 @@ export function PurchaseSheet({
         <Field label="What is it for">
           <input
             value={desc} onChange={(e) => setDesc(e.target.value)} maxLength={60}
-            className="w-40 rounded border border-hair bg-white px-2 py-1.5 text-[13px] outline-none focus:border-[#c8d9f7]"
+            className="w-40 rounded border border-hair bg-white px-2.5 py-2 text-[13px] outline-none focus:border-[#c8d9f7]"
           />
         </Field>
         <Field label="Category">
           <select
             value={category} onChange={(e) => setCategory(e.target.value)}
-            className="rounded border border-hair bg-white px-2 py-1.5 text-[13px] outline-none focus:border-[#c8d9f7]"
+            className="rounded border border-hair bg-white px-2.5 py-2 text-[13px] outline-none focus:border-[#c8d9f7]"
           >
             <option value="inventory">inventory</option>
             <option value="marketing">marketing</option>
@@ -86,8 +86,8 @@ export function PurchaseSheet({
             <input
               value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal"
               aria-invalid={touched && !amountOk}
-              className={`tnum w-28 rounded border bg-white px-2 py-1.5 text-[13px] outline-none focus:border-[#c8d9f7] ${
-                touched && !amountOk ? 'border-[#a35b2a]' : 'border-hair'
+              className={`tnum w-28 rounded border bg-white px-2.5 py-2 text-[13px] outline-none focus:border-[#c8d9f7] ${
+                touched && !amountOk ? 'border-[#ad4318]' : 'border-hair'
               }`}
             />
           </span>
@@ -97,14 +97,14 @@ export function PurchaseSheet({
             type="date" value={date} min={ws.today} max={addDays(ws.today, 90)}
             onChange={(e) => setDate(e.target.value)}
             aria-invalid={touched && !dateOk}
-            className={`tnum rounded border bg-white px-2 py-1.5 text-[13px] outline-none focus:border-[#c8d9f7] ${
-              touched && !dateOk ? 'border-[#a35b2a]' : 'border-hair'
+            className={`tnum rounded border bg-white px-2.5 py-2 text-[13px] outline-none focus:border-[#c8d9f7] ${
+              touched && !dateOk ? 'border-[#ad4318]' : 'border-hair'
             }`}
           />
         </Field>
         <button
           type="button" onClick={run} disabled={busy}
-          className="rounded-md bg-[#1b2b4b] px-4 py-2 text-[13px] font-semibold text-white disabled:opacity-50"
+          className="rounded-md border border-transparent bg-[#1b2b4b] px-[18px] py-2.5 text-[13.5px] font-semibold text-white disabled:opacity-50"
         >
           {busy ? 'Working…' : 'Check it'}
         </button>
@@ -115,13 +115,13 @@ export function PurchaseSheet({
           <div
             className={`mt-4 rounded-lg border p-4 ${
               result.breachesReserve
-                ? 'border-[#e6c7ae] bg-[#fdf3ec]'
+                ? 'border-[#ebc3ae] bg-[#fdf1ea]'
                 : 'border-[#c2e2ce] bg-[#f4fbf7]'
             }`}
           >
             <p
               className={`text-[17px] font-semibold leading-snug ${
-                result.breachesReserve ? 'text-[#8a4a1f]' : 'text-[#1f5c3c]'
+                result.breachesReserve ? 'text-[#8f3612]' : 'text-[#1f5c3c]'
               }`}
             >
               {result.breachesReserve
@@ -169,7 +169,7 @@ export function PurchaseSheet({
                     title={a.tradeoff}
                     className={`tnum rounded-full border px-3 py-1.5 text-[12px] ${
                       a.breachesReserve
-                        ? 'border-[#e6c7ae] bg-white text-[#8a4a1f]'
+                        ? 'border-[#ebc3ae] bg-white text-[#8f3612]'
                         : 'border-[#c2e2ce] bg-white text-[#1f5c3c]'
                     }`}
                   >
@@ -233,7 +233,7 @@ function Field({
         {label}
       </span>
       {children}
-      {error && <span className="text-[10.5px] text-[#a35b2a]">{error}</span>}
+      {error && <span className="text-[10.5px] text-[#ad4318]">{error}</span>}
     </label>
   )
 }

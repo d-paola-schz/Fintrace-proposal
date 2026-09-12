@@ -118,7 +118,7 @@ export function AssumptionEditor({
                   type="button"
                   onClick={() => patchOutflow(id, { removed: true })}
                   title="This payment does not apply to me"
-                  className="rounded px-1 text-[13px] leading-none text-muted hover:text-[#8a4a1f]"
+                  className="rounded px-1 text-[13px] leading-none text-muted hover:text-[#8f3612]"
                 >
                   ×
                 </button>

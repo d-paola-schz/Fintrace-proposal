@@ -20,6 +20,10 @@ import (
 const (
 	RulePayoutTiming = "rule-payout-timing"
 	RuleSalesStock   = "rule-sales-vs-availability"
+
+	// windowWeeks is how many weekly markers fall inside the 30-day window the
+	// sales chain's figures are measured over.
+	windowWeeks = 4
 )
 
 // BuildChains returns the chains for the current scenario result. Tones come
@@ -29,6 +33,18 @@ func (b *Builder) BuildChains(res contracts.ScenarioResult, events []contracts.F
 		b.payoutTimingChain(res, events),
 		b.salesStockChain(),
 	}
+}
+
+// presentEvents keeps only the ids that resolve to an event in this payload.
+// A step may never point the timeline at a day that is not on it.
+func presentEvents(events []contracts.FinancialEvent, ids ...string) []string {
+	out := []string{}
+	for _, id := range ids {
+		if _, ok := findEvent(events, id); ok {
+			out = append(out, id)
+		}
+	}
+	return out
 }
 
 func findEvent(events []contracts.FinancialEvent, id string) (contracts.FinancialEvent, bool) {
@@ -85,6 +101,8 @@ func (b *Builder) payoutTimingChain(res contracts.ScenarioResult, events []contr
 			"Why does this payment not come out of the payout?",
 			"What exactly is assumed about this payout?",
 		},
+		// The two dates the sentence above is comparing.
+		HighlightEventIDs: presentEvents(events, "evt-asm-supplier", "evt-payout"),
 	}
 
 	// ---- Node 02: the stress test. Tone follows the engine's finding.
@@ -104,7 +122,15 @@ func (b *Builder) payoutTimingChain(res contracts.ScenarioResult, events []contr
 			"Which payment causes the shortfall?",
 		},
 	}
+	// The payout is always part of this step; the outflow named alongside it is
+	// whichever one the engine actually blamed.
+	n2.HighlightEventIDs = presentEvents(events, "evt-payout")
 	if bp.Found {
+		if bp.DelayDays == 0 {
+			n2.HighlightEventIDs = presentEvents(events, "evt-payout", "evt-asm-supplier")
+		} else {
+			n2.HighlightEventIDs = presentEvents(events, "evt-payout", "evt-asm-rent")
+		}
 		n2.Tone = contracts.ToneRisk
 		if bp.DelayDays == 0 {
 			n2.Title = "The gap is already there"
@@ -187,6 +213,8 @@ func (b *Builder) payoutTimingChain(res contracts.ScenarioResult, events []contr
 			"Could I spend $3,000 on ads before month end?",
 			"What if I halve the ad spend instead?",
 		},
+		// The two outflows this step proposes moving.
+		HighlightEventIDs: presentEvents(events, "evt-asm-ads", "evt-asm-supplier"),
 	}
 
 	chain.Nodes = []contracts.ChainNode{n1, n2, n3}
@@ -208,10 +236,20 @@ func (b *Builder) salesStockChain() contracts.Chain {
 	avgNow := win.ItemRevenueCents / int64(max(1, win.ItemCount))
 	avgPrior := prior.ItemRevenueCents / int64(max(1, prior.ItemCount))
 
+	sales := b.salesEvents()
 	rootID := ""
-	for _, e := range b.salesEvents() {
-		rootID = e.ID // the most recent weekly marker
-		break
+	// The timeline now carries several months of recorded weeks, but the
+	// figures in this chain are measured over the 30-day window only. The
+	// highlight has to stay inside what the claims actually cover, or a step
+	// would point at weeks its own numbers do not include.
+	windowIDs := []string{}
+	for i, e := range sales {
+		if rootID == "" {
+			rootID = e.ID // the most recent weekly marker
+		}
+		if i < windowWeeks {
+			windowIDs = append(windowIDs, e.ID)
+		}
 	}
 
 	chain := contracts.Chain{
@@ -264,6 +302,8 @@ func (b *Builder) salesStockChain() contracts.Chain {
 			"Is this growth or just price?",
 			"Which categories moved?",
 		},
+		// The recorded weeks this comparison is made of.
+		HighlightEventIDs: windowIDs,
 	}
 
 	topShare := 0.0
@@ -307,6 +347,8 @@ func (b *Builder) salesStockChain() contracts.Chain {
 		},
 		ResponseOptions: []contracts.ResponseOption{},
 		SuggestedAsks:   []string{"What else sells alongside it?"},
+		// The same recorded weeks, counted by product rather than by revenue.
+		HighlightEventIDs: windowIDs,
 	}
 
 	n3 := contracts.ChainNode{
@@ -341,6 +383,10 @@ func (b *Builder) salesStockChain() contracts.Chain {
 				Action: "edit_proposal"},
 		},
 		SuggestedAsks: []string{"What is my margin on this product?"},
+		// Deliberately empty. Units on hand are not in the connected records,
+		// so there is no day on the timeline this step can point at, and the
+		// timeline says so by staying empty.
+		HighlightEventIDs: []string{},
 	}
 
 	chain.Nodes = []contracts.ChainNode{n1, n2, n3}

@@ -77,7 +77,7 @@ export function Chat({
                 {t.question}
               </p>
               {t.error && (
-                <p className="rounded-md border border-[#e6c7ae] bg-[#fdf3ec] px-2.5 py-1.5 text-[11.5px] text-[#8a4a1f]">
+                <p className="rounded-md border border-[#ebc3ae] bg-[#fdf1ea] px-2.5 py-1.5 text-[11.5px] text-[#8f3612]">
                   {t.error}
                 </p>
               )}
@@ -153,9 +153,9 @@ function CompleteProposal({
     return (
       <ul className="mt-2 space-y-1.5">
         {(response.missingInputs ?? []).map((m) => (
-          <li key={m.field} className="rounded bg-[#fdf8e9] px-2 py-1.5">
-            <p className="text-[11.5px] font-semibold text-[#7d5e0d]">{m.question}</p>
-            <p className="mt-0.5 text-[10.5px] leading-snug text-[#7d5e0d]/85">{m.whyItMatters}</p>
+          <li key={m.field} className="rounded bg-[#fdf7e4] px-2 py-1.5">
+            <p className="text-[11.5px] font-semibold text-[#7f5f06]">{m.question}</p>
+            <p className="mt-0.5 text-[10.5px] leading-snug text-[#7f5f06]/85">{m.whyItMatters}</p>
           </li>
         ))}
       </ul>
@@ -167,7 +167,7 @@ function CompleteProposal({
 
   return (
     <form
-      className="mt-2 rounded-md border border-[#e3d19a] bg-[#fdf8e9] p-2.5"
+      className="mt-2 rounded-md border border-[#e8d296] bg-[#fdf7e4] p-2.5"
       onSubmit={(e) => {
         e.preventDefault()
         if (!ready) return
@@ -177,29 +177,29 @@ function CompleteProposal({
         })
       }}
     >
-      <p className="text-[11.5px] font-semibold text-[#7d5e0d]">
+      <p className="text-[11.5px] font-semibold text-[#7f5f06]">
         {(response.missingInputs ?? []).map((m) => m.question).join(' ')}
       </p>
       <div className="mt-2 flex flex-wrap items-end gap-2">
         <label className="flex flex-col gap-1">
-          <span className="text-[9.5px] font-semibold uppercase tracking-[0.06em] text-[#7d5e0d]">
+          <span className="text-[9.5px] font-semibold uppercase tracking-[0.06em] text-[#7f5f06]">
             Amount
           </span>
           <span className="flex items-center gap-1">
-            <span className="text-[11.5px] text-[#7d5e0d]">$</span>
+            <span className="text-[11.5px] text-[#7f5f06]">$</span>
             <input
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               inputMode="decimal"
               aria-label="Amount in dollars"
               className={`tnum w-24 rounded border bg-white px-2 py-1 text-[12px] outline-none ${
-                missing.has('amountCents') && !amount ? 'border-[#a35b2a]' : 'border-hair'
+                missing.has('amountCents') && !amount ? 'border-[#ad4318]' : 'border-hair'
               }`}
             />
           </span>
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-[9.5px] font-semibold uppercase tracking-[0.06em] text-[#7d5e0d]">
+          <span className="text-[9.5px] font-semibold uppercase tracking-[0.06em] text-[#7f5f06]">
             Leaves the account
           </span>
           <input
@@ -209,19 +209,19 @@ function CompleteProposal({
             onChange={(e) => setDate(e.target.value)}
             aria-label="Date the money leaves the account"
             className={`tnum rounded border bg-white px-2 py-1 text-[12px] outline-none ${
-              missing.has('date') && !date ? 'border-[#a35b2a]' : 'border-hair'
+              missing.has('date') && !date ? 'border-[#ad4318]' : 'border-hair'
             }`}
           />
         </label>
         <button
           type="submit"
           disabled={!ready}
-          className="rounded bg-[#7d5e0d] px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-40"
+          className="rounded bg-[#7f5f06] px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-40"
         >
           Calculate it
         </button>
       </div>
-      <p className="mt-1.5 text-[10px] leading-snug text-[#7d5e0d]/85">
+      <p className="mt-1.5 text-[10px] leading-snug text-[#7f5f06]/85">
         {(response.missingInputs ?? [])[0]?.whyItMatters}
       </p>
     </form>

@@ -82,6 +82,12 @@ export interface ChainNode {
   chart?: ChartSpec
   responseOptions: ResponseOption[]
   suggestedAsks?: string[]
+  /**
+   * The dated events this step is about, named by the Go rule that wrote it.
+   * The timeline brings just these back while the step is being read. An empty
+   * array is meaningful: it says no recorded day backs this step.
+   */
+  highlightEventIds: string[]
 }
 
 export interface ChainSegment {
@@ -234,6 +240,8 @@ export interface ScenarioResult {
   proposal?: ProposedDecision
   withoutProposal?: CashPath
   deltaLowestCents: number
+  /** The plan with no delay and no proposal. Present whenever a what-if is shown. */
+  onTimePlan?: CashPath
   delayBreakpoint: DelayBreakpoint
   alternatives: Alternative[]
   appliedEvents: FinancialEvent[]
@@ -279,6 +287,17 @@ export interface BriefingAction {
   nodeId?: string
 }
 
+/** How the stretch of days the briefing is about reads. */
+export type HighlightLevel = 'good' | 'watch' | 'risk'
+
+export interface BriefingHighlight {
+  level: HighlightLevel
+  startDate: string
+  endDate: string
+  /** One line, for a reader who has only hovered. */
+  summary: string
+}
+
 export interface Briefing {
   mode: 'plan' | 'scenario'
   status: 'on_track' | 'at_risk'
@@ -287,6 +306,7 @@ export interface Briefing {
   watch?: string
   scenarioLabel?: string
   seeWhy?: BriefingAction
+  highlight?: BriefingHighlight
 }
 
 export interface Outlook {
@@ -322,6 +342,36 @@ export interface WorkspaceResponse {
   alert?: WorkspaceAlert
   dataNotice: string
   generatedAt: string
+  /** Present only while a what-if is shown. */
+  branch?: WhatIfBranch
+}
+
+/**
+ * A what-if drawn as its own timeline beside the plan. The server decides what
+ * changed; the interface draws exactly that and never infers it.
+ */
+export interface WhatIfBranch {
+  label: string
+  /** Where the branch leaves the plan. Never before today. */
+  startDate: string
+  endDate: string
+  changedEventIds: string[]
+  removedEventIds: string[]
+  changedChainIds: string[]
+  unchangedChainIds: string[]
+  unchangedEventCount: number
+  /** Says that only differences are drawn, and what was left out. */
+  note: string
+  /** Events the what-if keeps but puts on a different day. */
+  moves: EventMove[]
+}
+
+export interface EventMove {
+  eventId: string
+  fromDate: string
+  toDate: string
+  /** toDate minus fromDate in whole days; positive means later. */
+  days: number
 }
 
 export interface ChatRequest {

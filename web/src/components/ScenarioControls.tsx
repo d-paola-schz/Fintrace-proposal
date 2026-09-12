@@ -71,7 +71,7 @@ export function ScenarioControls({
         <span
           className={`tnum rounded border px-2 py-[3px] text-[10.5px] ${
             bp.delayDays === 0 || scenario.payoutDelayDays >= bp.delayDays
-              ? 'border-[#e6c7ae] bg-[#fdf3ec] text-[#8a4a1f]'
+              ? 'border-[#ebc3ae] bg-[#fdf1ea] text-[#8f3612]'
               : 'border-hair bg-white text-muted'
           }`}
         >
@@ -103,7 +103,7 @@ export function ScenarioControls({
           <button
             type="button"
             onClick={onReset}
-            className="rounded border border-hair px-2.5 py-1 text-[11.5px] text-[#3d4757] hover:border-[#c8d9f7]"
+            className="rounded border border-hair px-3 py-1.5 text-[12px] text-[#3d4757] hover:border-[#c8d9f7]"
           >
             Reset
           </button>
@@ -112,7 +112,7 @@ export function ScenarioControls({
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="rounded bg-[#1b2b4b] px-3 py-1 text-[11.5px] font-medium text-white"
+          className="rounded bg-[#1b2b4b] px-3.5 py-1.5 text-[12px] font-medium text-white"
         >
           {scenario.proposal ? 'Edit the spend' : 'Propose a spend'}
         </button>

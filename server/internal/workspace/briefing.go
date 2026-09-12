@@ -75,6 +75,8 @@ func (b *Builder) BuildBriefing(
 		br.Watch = "Nothing here has been applied to your modelled plan."
 	}
 
+	br.Highlight = highlightFor(res)
+
 	// Where to look. Prefer the chain that explains the risk just named.
 	if node, chain, event := firstStepOf(chains, "chain-payout", events); node != "" {
 		br.SeeWhy = &contracts.BriefingAction{
@@ -121,4 +123,44 @@ func firstStepOf(chains []contracts.Chain, preferred string, _ []contracts.Finan
 		return pick(chains[0])
 	}
 	return "", "", ""
+}
+
+// highlightFor marks the days the briefing is about, and how they read.
+//
+// The span runs from the start of the projection to whichever comes later: the
+// day cash bottoms out, or the day it first falls through the reserve. Both are
+// engine outputs, so the band can never point at a day the projection does not
+// contain.
+//
+// Three levels, because two were not enough to be useful: a plan that holds and
+// a plan that holds only while nothing slips are different situations, and the
+// owner wants to tell them apart at a glance.
+func highlightFor(res contracts.ScenarioResult) *contracts.BriefingHighlight {
+	end := res.LowestDate
+	if res.FirstBreachDate != "" && res.FirstBreachDate > end {
+		end = res.FirstBreachDate
+	}
+	if res.StartDate == "" || end == "" {
+		return nil
+	}
+
+	bp := res.DelayBreakpoint
+	h := &contracts.BriefingHighlight{StartDate: res.StartDate, EndDate: end}
+	switch {
+	case res.BreachesReserve:
+		h.Level = "risk"
+		h.Summary = fmt.Sprintf("Cash falls to %s on %s, below your %s reserve.",
+			finance.FormatUSD(res.LowestCents), finance.HumanDate(res.LowestDate),
+			finance.FormatUSD(res.ReserveCents))
+	case bp.Found && bp.DelayDays > 0:
+		h.Level = "watch"
+		h.Summary = fmt.Sprintf("Holds at %s on %s, but a payout %d days late would break it.",
+			finance.FormatUSD(res.LowestCents), finance.HumanDate(res.LowestDate), bp.DelayDays)
+	default:
+		h.Level = "good"
+		h.Summary = fmt.Sprintf("Lowest is %s on %s, %s clear of your %s reserve.",
+			finance.FormatUSD(res.LowestCents), finance.HumanDate(res.LowestDate),
+			finance.FormatUSD(res.HeadroomCents), finance.FormatUSD(res.ReserveCents))
+	}
+	return h
 }

@@ -131,6 +131,15 @@ type ChainNode struct {
 	Chart           *ChartSpec       `json:"chart,omitempty"`
 	ResponseOptions []ResponseOption `json:"responseOptions"`
 	SuggestedAsks   []string         `json:"suggestedAsks,omitempty"`
+
+	// HighlightEventIDs are the dated events this step is actually talking
+	// about, named by the rule that wrote the step. The interface brings just
+	// these back onto the timeline while the step is being read, so the owner
+	// can see which days a sentence refers to.
+	//
+	// This adds no figure and no claim. Every id here must already be an event
+	// in the same payload; a test enforces that.
+	HighlightEventIDs []string `json:"highlightEventIds"`
 }
 
 // ChainSegment is the strand between two consecutive levels. Segments carry
@@ -396,6 +405,68 @@ type Briefing struct {
 	// ScenarioLabel is set only while a what-if is being shown.
 	ScenarioLabel string          `json:"scenarioLabel,omitempty"`
 	SeeWhy        *BriefingAction `json:"seeWhy,omitempty"`
+	// Highlight marks the stretch of the timeline this briefing is about, so
+	// the interface can say it on the timeline itself rather than in a
+	// paragraph above it.
+	Highlight *BriefingHighlight `json:"highlight,omitempty"`
+}
+
+// BriefingHighlight is the span of days the opening insight concerns, and how
+// that span reads.
+//
+// Level is not a restatement of Status. Status answers "does the modelled plan
+// breach the reserve"; Level adds the middle case the owner actually cares
+// about — the plan holds, but a delay inside the tested range would break it.
+// Both come from the engine; neither is a judgement written by hand.
+type BriefingHighlight struct {
+	// Level is good | watch | risk.
+	Level     string `json:"level"`
+	StartDate string `json:"startDate"`
+	EndDate   string `json:"endDate"`
+	// Summary is one line, for a reader who has only hovered.
+	Summary string `json:"summary"`
+}
+
+// WhatIfBranch is a what-if drawn as its own timeline beside the plan.
+//
+// The owner reads both at once, so the what-if draws only what it changes. The
+// server decides what changed, never the interface: an event or chain counts
+// as changed when anything it would render differs from the plan's copy — a
+// date, an amount, a title, a tone, a figure or a chart point. Nothing is
+// hidden for merely looking similar, and nothing unchanged is drawn twice.
+type WhatIfBranch struct {
+	// Label names the what-if in the owner's terms, e.g. the spend and its date.
+	Label string `json:"label"`
+	// StartDate is where the branch leaves the plan: the earliest date of any
+	// event the what-if adds, moves, changes or removes, on either side of the
+	// change, and never before today.
+	StartDate string `json:"startDate"`
+	// EndDate is the end of the what-if's own window.
+	EndDate string `json:"endDate"`
+	// ChangedEventIDs are events whose what-if copy differs from the plan's, or
+	// that the plan does not contain at all.
+	ChangedEventIDs []string `json:"changedEventIds"`
+	// RemovedEventIDs are plan events the what-if does not contain.
+	RemovedEventIDs []string `json:"removedEventIds"`
+	ChangedChainIDs []string `json:"changedChainIds"`
+	// UnchangedChainIDs are chains that read exactly as they do on the plan.
+	UnchangedChainIDs []string `json:"unchangedChainIds"`
+	// UnchangedEventCount counts events identical in both, balance rows aside.
+	UnchangedEventCount int `json:"unchangedEventCount"`
+	// Note says in words that only differences are drawn, and what was left out.
+	Note string `json:"note"`
+	// Moves are events the what-if keeps but puts on a different day, so the
+	// timeline can show where each one was and where it went.
+	Moves []EventMove `json:"moves"`
+}
+
+// EventMove is one event the what-if moves to another day.
+type EventMove struct {
+	EventID  string `json:"eventId"`
+	FromDate string `json:"fromDate"`
+	ToDate   string `json:"toDate"`
+	// Days is ToDate minus FromDate in whole days; positive means later.
+	Days int `json:"days"`
 }
 
 // Outlook is the first thing the owner reads: where the plan stands, and
@@ -436,6 +507,9 @@ type WorkspaceResponse struct {
 	Alert           *WorkspaceAlert  `json:"alert,omitempty"`
 	DataNotice      string           `json:"dataNotice"`
 	GeneratedAt     string           `json:"generatedAt"`
+	// Branch is present only while a what-if is shown. It describes the what-if
+	// as a second timeline branching off the plan, and says what it changes.
+	Branch *WhatIfBranch `json:"branch,omitempty"`
 }
 
 // WorkspaceAlert is the single banner line. It must point at a real future event.
@@ -620,11 +694,19 @@ func (w *WorkspaceResponse) Sanitize() {
 			n.AssumptionRefs = nonNil(n.AssumptionRefs)
 			n.ResponseOptions = nonNil(n.ResponseOptions)
 			n.SuggestedAsks = nonNil(n.SuggestedAsks)
+			n.HighlightEventIDs = nonNil(n.HighlightEventIDs)
 			n.Chart = sanitizeChart(n.Chart)
 		}
 	}
 	if w.Alert != nil {
 		w.Alert.EventIDs = nonNil(w.Alert.EventIDs)
+	}
+	if w.Branch != nil {
+		w.Branch.ChangedEventIDs = nonNil(w.Branch.ChangedEventIDs)
+		w.Branch.RemovedEventIDs = nonNil(w.Branch.RemovedEventIDs)
+		w.Branch.ChangedChainIDs = nonNil(w.Branch.ChangedChainIDs)
+		w.Branch.UnchangedChainIDs = nonNil(w.Branch.UnchangedChainIDs)
+		w.Branch.Moves = nonNil(w.Branch.Moves)
 	}
 	w.Scenario.Sanitize()
 }

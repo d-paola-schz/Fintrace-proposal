@@ -98,7 +98,7 @@ export function ScenarioSheet({
           <button
             type="button"
             onClick={onReset}
-            className="mt-2 rounded border border-hair bg-white px-2.5 py-1 text-[11.5px] font-medium text-[#3d4757] hover:border-[#c8d9f7]"
+            className="mt-2 rounded border border-hair bg-white px-3 py-1.5 text-[12px] font-medium text-[#3d4757] hover:border-[#c8d9f7]"
           >
             Back to the current plan
           </button>

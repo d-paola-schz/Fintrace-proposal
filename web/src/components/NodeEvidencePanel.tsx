@@ -267,7 +267,7 @@ function EventPanel({ event, onClose }: { event: FinancialEvent; onClose: () => 
         className={`mt-1 inline-block rounded px-1.5 py-[2px] text-[10.5px] font-medium ${
           event.affectsCash
             ? 'bg-[#eef4ff] text-[#26457f]'
-            : 'bg-[#f3f5f8] text-[#4a5566]'
+            : 'bg-[#f2f4f9] text-[#46536b]'
         }`}
       >
         {event.affectsCash
@@ -337,9 +337,9 @@ function OverviewPanel({
       <Section title="What this cannot tell you" count={(s.missingInputs ?? []).length}>
         <ul className="space-y-1.5">
           {(s.missingInputs ?? []).map((m) => (
-            <li key={m.field} className="rounded-lg border border-[#e3d19a] bg-[#fdf8e9] p-2.5">
-              <p className="text-[11.5px] font-semibold text-[#7d5e0d]">{m.question}</p>
-              <p className="mt-0.5 text-[10.5px] leading-snug text-[#7d5e0d]/85">{m.whyItMatters}</p>
+            <li key={m.field} className="rounded-lg border border-[#e8d296] bg-[#fdf7e4] p-2.5">
+              <p className="text-[11.5px] font-semibold text-[#7f5f06]">{m.question}</p>
+              <p className="mt-0.5 text-[10.5px] leading-snug text-[#7f5f06]/85">{m.whyItMatters}</p>
             </li>
           ))}
         </ul>

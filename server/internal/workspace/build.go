@@ -11,7 +11,31 @@ import (
 )
 
 // Build assembles the full workspace for one scenario request.
+//
+// A what-if also carries its branch: the same request with the what-if taken
+// out is built alongside it, and the two are compared, so the interface can
+// draw the what-if as a second timeline showing only what it changes.
 func (b *Builder) Build(req contracts.ScenarioRequest) contracts.WorkspaceResponse {
+	resp := b.build(req)
+	if resp.Scenario.ScenarioActive {
+		// Reserve and figure edits are plan inputs, not hypotheticals, so the plan
+		// being branched from keeps them. Only the what-if itself is removed.
+		planReq := req
+		planReq.Proposal = nil
+		planReq.PayoutDelayDays = 0
+		plan := b.build(planReq)
+		b.Overrides = req.Assumptions
+
+		// Compare normalized payloads, so a nil slice on one side and an empty one
+		// on the other can never count as a difference.
+		plan.Sanitize()
+		resp.Sanitize()
+		resp.Branch = BuildBranch(plan, resp)
+	}
+	return resp
+}
+
+func (b *Builder) build(req contracts.ScenarioRequest) contracts.WorkspaceResponse {
 	b.Overrides = req.Assumptions
 	events := b.Events()
 	res := b.RunScenario(req, events)

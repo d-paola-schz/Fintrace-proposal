@@ -46,9 +46,9 @@ export function AskSheet({
       <Section title="What this cannot tell you" count={(ws.scenario.missingInputs ?? []).length}>
         <ul className="space-y-1.5">
           {(ws.scenario.missingInputs ?? []).map((m) => (
-            <li key={m.field} className="rounded-lg border border-[#e3d19a] bg-[#fdf8e9] p-2.5">
-              <p className="text-[11.5px] font-semibold text-[#7d5e0d]">{m.question}</p>
-              <p className="mt-0.5 text-[10.5px] leading-snug text-[#7d5e0d]/85">
+            <li key={m.field} className="rounded-lg border border-[#e8d296] bg-[#fdf7e4] p-2.5">
+              <p className="text-[11.5px] font-semibold text-[#7f5f06]">{m.question}</p>
+              <p className="mt-0.5 text-[10.5px] leading-snug text-[#7f5f06]/85">
                 {m.whyItMatters}
               </p>
             </li>

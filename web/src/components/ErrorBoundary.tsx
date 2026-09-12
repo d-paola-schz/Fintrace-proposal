@@ -35,21 +35,21 @@ export class ErrorBoundary extends Component<Props, State> {
 
     return (
       <div className="flex h-full min-h-[120px] items-center justify-center p-4">
-        <div className="max-w-sm rounded-lg border border-[#e6c7ae] bg-[#fdf3ec] p-3">
-          <p className="text-[12px] font-semibold text-[#8a4a1f]">
+        <div className="max-w-sm rounded-lg border border-[#ebc3ae] bg-[#fdf1ea] p-3">
+          <p className="text-[12px] font-semibold text-[#8f3612]">
             {this.props.area} could not be displayed
           </p>
-          <p className="mt-1 text-[11px] leading-snug text-[#8a4a1f]">
+          <p className="mt-1 text-[11px] leading-snug text-[#8f3612]">
             The rest of the workspace is unaffected, and no figure elsewhere on this page
             depends on it.
           </p>
-          <p className="mt-1.5 font-mono text-[10px] leading-snug text-[#8a4a1f]/80">
+          <p className="mt-1.5 font-mono text-[10px] leading-snug text-[#8f3612]/80">
             {error.message}
           </p>
           <button
             type="button"
             onClick={() => this.setState({ error: null })}
-            className="mt-2 rounded bg-[#8a4a1f] px-2.5 py-1 text-[11px] font-medium text-white"
+            className="mt-2 rounded bg-[#8f3612] px-2.5 py-1 text-[11px] font-medium text-white"
           >
             Try again
           </button>
