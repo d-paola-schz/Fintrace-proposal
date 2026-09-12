@@ -54,7 +54,7 @@ Copy `.env.example` and fill in what you have.
 | `NESSIE_ACCOUNT_ID` | no | The sandbox account with the largest balance is used. |
 | `NESSIE_BASE_URL` | no | Defaults to `https://api.nessieisreal.com`. |
 | `GEMINI_API_KEY` | no | Header shows `AI UNAVAILABLE`; the engine writes chat answers itself and says so. Nothing is faked. |
-| `GEMINI_MODEL` | no | Defaults to `gemini-3.6-flash`. Confirm free-tier eligibility before deploying — Google discontinues model names over time; if `/api/probe` reports a 404, the response names the models your key can actually use. |
+| `GEMINI_MODEL` | no | Defaults to `gemini-3.1-flash-lite` — chosen for its free-tier daily quota (500 requests/day vs. 20 for plain `gemini-3.6-flash` at the time of writing), which the full-size tier can exhaust mid-demo. Confirm current free-tier limits for your key in Google AI Studio before presenting; they change over time. If `/api/probe` reports a 404, the response names the models your key can actually use. |
 | `GEMINI_BASE_URL` | no | Defaults to `https://generativelanguage.googleapis.com`. Only for testing against a stub. |
 | `AI_PROVIDER` | no | `gemini` when a key is present, otherwise none. Set `ollama` for a local model. |
 | `OLLAMA_BASE_URL` | no | Defaults to `http://127.0.0.1:11434`. Never expose it publicly. |

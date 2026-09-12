@@ -126,3 +126,35 @@ func TestHeuristicIntentRouting(t *testing.T) {
 		}
 	}
 }
+
+// With the model unavailable, the heuristic router is the only thing standing
+// between an off-topic question and a fabricated-looking answer. A question
+// with nothing to do with cash, sales or the workspace must be refused, even
+// when a node happens to be open — an open node must not make every question
+// about that node.
+func TestHeuristicIntentRefusesOffTopicQuestions(t *testing.T) {
+	offTopic := []string{
+		"what's the weather now?",
+		"tell me a joke",
+		"who won the game last night",
+		"what is the capital of France",
+	}
+	for _, q := range offTopic {
+		if got := heuristicIntent(q, ""); got != ai.IntentUnsupported {
+			t.Errorf("%q with no node open -> %s, want unsupported", q, got)
+		}
+		if got := heuristicIntent(q, "node-payout-2"); got != ai.IntentUnsupported {
+			t.Errorf("%q with a node open -> %s, want unsupported, not an explanation of the open node", q, got)
+		}
+	}
+}
+
+// A short, in-domain follow-up while a node is open should still explain that
+// node — the fix must not make the assistant refuse ordinary follow-ups.
+func TestHeuristicIntentStillExplainsOpenNodeForInDomainFollowUps(t *testing.T) {
+	for _, q := range []string{"why?", "explain this", "tell me more"} {
+		if got := heuristicIntent(q, "node-payout-2"); got != ai.IntentExplainNode {
+			t.Errorf("%q with a node open -> %s, want explain_node", q, got)
+		}
+	}
+}
