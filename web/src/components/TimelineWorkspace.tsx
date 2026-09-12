@@ -1,11 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { Chain, WorkspaceResponse } from '../types/contracts'
-import { addDays, daysBetween, shortDate, usd } from '../lib/format'
+import { addDays, daysBetween, parseDay, shortDate, usd } from '../lib/format'
 import { CARD_H, CARD_H_COMPACT, CARD_W, EventCard } from './EventCard'
 import { BAND_H, CashComparison } from './CashComparison'
-import {
-  ChainPreview, PREVIEW_DROP, PREVIEW_H, previewStubPath,
-} from './ChainPreview'
 import {
   ChainNodeCard, ChainStrand, DEFAULT_METRICS, NODE_H, NODE_H_COMPACT, layoutChain,
   type ChainMetrics,
@@ -101,9 +98,7 @@ export function TimelineWorkspace({
   const comparing = !!ws.scenario.withoutProposal && !!ws.scenario.proposal
   const bandTop = 24
 
-  const openChain = ws.chains.find((c) => c.id === openChainId) ?? null
-  const openAbove = openChain?.direction === 'above'
-  const openBelow = openChain?.direction === 'below'
+  const focusChain = ws.chains.find((c) => c.id === openChainId) ?? null
 
   // Vertical budget. Only the open chain needs room for three levels; a
   // collapsed chain needs a tag's worth.
@@ -114,17 +109,16 @@ export function TimelineWorkspace({
   const clampGap = (avail: number, first: number) =>
     Math.round(Math.min(120, Math.max(GAP_FLOOR, (avail - nodeH - first) / 2)))
 
-  const collapsedAboveNeed = cardBandH + 20 + PREVIEW_DROP + PREVIEW_H + 26
-  const gapAbove = clampGap(frameH / 2 - cardBandH - (compact ? 36 : 46), FIRST_ABOVE)
-  const expandedAboveNeed =
-    cardBandH + 20 + FIRST_ABOVE + 2 * gapAbove + nodeH / 2 + (compact ? 20 : 26)
-  const aboveNeed = openAbove ? expandedAboveNeed : collapsedAboveNeed
+  // Both chains are drawn from the moment the page loads: they are the point of
+  // the product, not a detail to be opened. Sizing is therefore budgeted for
+  // three levels on each side of the rail at once.
+  const gapAbove = clampGap(frameH / 2 - cardBandH - (compact ? 34 : 42), FIRST_ABOVE)
+  const aboveNeed =
+    cardBandH + 18 + FIRST_ABOVE + 2 * gapAbove + nodeH / 2 + (compact ? 18 : 24)
 
   const axisY = Math.max(Math.round(frameH / 2), Math.round(aboveNeed))
-  const gapBelow = clampGap(Math.max(frameH, axisY + 190) - axisY - 44, FIRST_BELOW)
-  const belowNeed = openBelow
-    ? FIRST_BELOW + 2 * gapBelow + nodeH / 2 + (compact ? 28 : 38)
-    : FIRST_BELOW + PREVIEW_DROP + PREVIEW_H + 30
+  const gapBelow = clampGap(Math.max(frameH, axisY + 190) - axisY - 42, FIRST_BELOW)
+  const belowNeed = FIRST_BELOW + 2 * gapBelow + nodeH / 2 + (compact ? 26 : 34)
   const canvasH = Math.max(frameH, Math.round(axisY + belowNeed))
 
   const cardTop = (row: number) => axisY - 20 - (row + 1) * (cardH + CARD_ROW_GAP)
@@ -141,12 +135,16 @@ export function TimelineWorkspace({
     return { anchorX, anchorY: axisY - cardBandH - 20, dir: -1 as const }
   }
 
-  const openLayout = useMemo(() => {
-    if (!openChain) return null
-    const { anchorX, anchorY, dir } = anchorFor(openChain)
-    return { chain: openChain, layout: layoutChain(openChain, anchorX, anchorY, dir, false, metricsFor(dir)) }
+  const layouts = useMemo(
+    () =>
+      ws.chains.map((chain) => {
+        const { anchorX, anchorY, dir } = anchorFor(chain)
+        return { chain, layout: layoutChain(chain, anchorX, anchorY, dir, false, metricsFor(dir)) }
+      }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openChain, ws.events, axisY, cardBandH, gapAbove, gapBelow, nodeH, FIRST_BELOW])
+    [ws.chains, ws.events, axisY, cardBandH, gapAbove, gapBelow, nodeH, FIRST_BELOW],
+  )
+  const focusLayout = layouts.find((l) => l.chain.id === openChainId) ?? null
 
   useEffect(() => {
     if (didCenter.current || !scrollRef.current) return
@@ -162,15 +160,13 @@ export function TimelineWorkspace({
     if (!el) return
     if (comparing) {
       el.scrollTo({ top: Math.max(0, axisY - RAIL_H - 52), behavior: 'smooth' })
-    } else if (!openChain) {
-      el.scrollTo({ top: 0, behavior: 'smooth' })
     }
-    if (openLayout) {
+    if (focusLayout) {
       const visible = Math.max(240, el.clientWidth - rightInset)
-      const centre = (openLayout.layout.minX + openLayout.layout.maxX) / 2
+      const centre = (focusLayout.layout.minX + focusLayout.layout.maxX) / 2
       el.scrollTo({ left: Math.max(0, centre - visible / 2), behavior: 'smooth' })
     }
-  }, [comparing, openChain, axisY, openLayout, rightInset])
+  }, [comparing, axisY, focusLayout, rightInset])
 
   const todayX = x(ws.today)
   const ticks = useMemo(() => {
@@ -182,8 +178,26 @@ export function TimelineWorkspace({
     return out
   }, [ws.windowStart, totalDays])
 
+  // Calendar structure: week rules give the axis a rhythm to read against, and
+  // month bands say where in the year you are without reading every tick.
+  const weeks = useMemo(() => {
+    const out: string[] = []
+    for (let d = 0; d <= totalDays; d += 1) {
+      const iso = addDays(ws.windowStart, d)
+      if (parseDay(iso).getUTCDay() === 1) out.push(iso)
+    }
+    return out
+  }, [ws.windowStart, totalDays])
+
+
   const chainRoots = new Set(ws.chains.map((c) => c.rootEventId))
   const railEnd = canvasW - EDGE_PAD + 44
+
+  const inWindow = (d?: string) => !!d && d >= ws.windowStart && d <= ws.windowEnd
+  const lowMark = inWindow(ws.scenario.lowestDate) ? x(ws.scenario.lowestDate) : null
+  const breachMark = inWindow(ws.scenario.firstBreachDate)
+    ? x(ws.scenario.firstBreachDate!)
+    : null
 
   return (
     <div ref={frameRef} className="relative h-full min-h-0">
@@ -216,6 +230,12 @@ export function TimelineWorkspace({
               </filter>
             </defs>
 
+            {/* week rules, behind everything */}
+            {weeks.map((iso) => (
+              <line key={`wk-${iso}`} x1={x(iso)} y1={18} x2={x(iso)} y2={canvasH - 18}
+                stroke="#1b2b4b" strokeWidth={1} opacity={0.05} />
+            ))}
+
             <g filter="url(#railShadow)">
               <rect x={EDGE_PAD - 44} y={axisY - RAIL_H / 2}
                 width={Math.max(0, todayX - (EDGE_PAD - 44))} height={RAIL_H}
@@ -245,6 +265,26 @@ export function TimelineWorkspace({
             <line x1={todayX} y1={24} x2={todayX} y2={canvasH - 24}
               stroke="var(--color-flow)" strokeWidth={1.25} strokeDasharray="2 7" opacity={0.3} />
 
+            {/* The three dates that decide everything, marked on the rail
+                itself: where cash bottoms out, and where it would first fall
+                through the reserve. A date axis alone made the owner hunt. */}
+            {lowMark != null && (
+              <g>
+                <line x1={lowMark} y1={axisY - RAIL_H / 2 - 16} x2={lowMark} y2={axisY - RAIL_H / 2}
+                  stroke={ws.scenario.breachesReserve ? '#a35b2a' : '#15803d'} strokeWidth={1.6} />
+                <circle cx={lowMark} cy={axisY} r={4.6} fill="#fff"
+                  stroke={ws.scenario.breachesReserve ? '#a35b2a' : '#15803d'} strokeWidth={2.4} />
+              </g>
+            )}
+            {breachMark != null && breachMark !== lowMark && (
+              <g>
+                <line x1={breachMark} y1={axisY - RAIL_H / 2 - 16} x2={breachMark}
+                  y2={axisY - RAIL_H / 2} stroke="#a35b2a" strokeWidth={1.6}
+                  strokeDasharray="3 3" />
+                <circle cx={breachMark} cy={axisY} r={4.2} fill="#fff" stroke="#a35b2a" strokeWidth={2.2} />
+              </g>
+            )}
+
             {placed.map(({ event, row }) => {
               const hot = event.id === selectedEventId
               return (
@@ -259,23 +299,15 @@ export function TimelineWorkspace({
               )
             })}
 
-            {/* stubs for collapsed chains */}
-            {ws.chains.filter((c) => c.id !== openChainId).map((c) => {
-              const { anchorX, dir } = anchorFor(c)
-              const from = dir === 1 ? axisY : axisY - cardBandH - 20
-              const to = dir === 1 ? from + PREVIEW_DROP : from - PREVIEW_DROP
-              return (
-                <path key={`stub-${c.id}`} d={previewStubPath(anchorX, from, to)}
-                  fill="none" stroke="#b9a48c" strokeWidth={2.6} strokeDasharray="1.2 6"
-                  strokeLinecap="round" opacity={0.85} />
-              )
-            })}
-
             {comparing && (
               <CashComparison scenario={ws.scenario} x={x} top={axisY + RAIL_H / 2 + bandTop} />
             )}
 
-            {openLayout && <ChainStrand layout={openLayout.layout} />}
+            {layouts.map(({ chain, layout }) => (
+              <g key={chain.id} opacity={focusChain && focusChain.id !== chain.id ? 0.45 : 1}>
+                <ChainStrand layout={layout} />
+              </g>
+            ))}
           </svg>
 
           <div className="absolute z-20 -translate-x-1/2 rounded-full border border-[#c8d9f7] bg-white px-3 py-1 shadow-sm"
@@ -285,45 +317,57 @@ export function TimelineWorkspace({
             </span>
           </div>
 
+          {lowMark != null && (
+            <span
+              className="tnum absolute z-20 -translate-x-1/2 whitespace-nowrap rounded-full border bg-white px-2.5 py-1 text-[10.5px] font-semibold shadow-sm"
+              style={{
+                left: lowMark,
+                top: axisY - RAIL_H / 2 - 28,
+                borderColor: ws.scenario.breachesReserve ? '#e6c7ae' : '#c2e2ce',
+                color: ws.scenario.breachesReserve ? '#8a4a1f' : '#1f5c3c',
+              }}
+            >
+              Lowest {usd(ws.scenario.lowestCents)}
+            </span>
+          )}
+
           {placed.map(({ event, row }) => (
             <EventCard key={event.id} event={event} x={x(event.date)} y={cardTop(row)} h={cardH}
               hasChain={chainRoots.has(event.id)} highlighted={false}
+              muted={!event.affectsCash && !chainRoots.has(event.id)}
               selected={selectedEventId === event.id} onSelect={onSelectEvent} />
           ))}
 
-          {/* collapsed chains */}
-          {ws.chains.filter((c) => c.id !== openChainId).map((c) => {
-            const { anchorX, dir } = anchorFor(c)
-            const from = dir === 1 ? axisY : axisY - cardBandH - 20
-            const to = dir === 1 ? from + PREVIEW_DROP : from - PREVIEW_DROP
+          {layouts.map(({ chain, layout }) => {
+            const dimmed = !!focusChain && focusChain.id !== chain.id
             return (
-              <ChainPreview key={c.id} chain={c} x={anchorX} y={to} dir={dir}
-                selected={false} onSelect={onToggleChain} />
+              <div key={chain.id}>
+                <button
+                  type="button"
+                  onClick={() => onToggleChain(chain.id)}
+                  aria-pressed={focusChain?.id === chain.id}
+                  className={`absolute z-10 -translate-x-1/2 whitespace-nowrap rounded-full border px-2.5 py-[3px] text-[10.5px] font-medium transition-opacity ${
+                    focusChain?.id === chain.id
+                      ? 'border-[#c8d9f7] bg-[#eef4ff] text-[#26457f]'
+                      : 'border-hair bg-white text-muted hover:border-[#c8d9f7] hover:text-ink'
+                  } ${dimmed ? 'opacity-70' : ''}`}
+                  style={{
+                    left: (layout.minX + layout.maxX) / 2,
+                    top: chain.direction === 'below'
+                      ? layout.maxY + 8
+                      : Math.max(2, layout.minY - 22),
+                  }}
+                >
+                  {chain.title} · {chain.nodes.length} steps
+                </button>
+                {layout.levels.map((lv) => (
+                  <ChainNodeCard key={lv.node.id} node={lv.node} x={lv.nodeX} y={lv.y} h={nodeH}
+                    selected={selectedNodeId === lv.node.id} dimmed={dimmed}
+                    onSelect={onSelectNode} />
+                ))}
+              </div>
             )
           })}
-
-          {/* the open chain */}
-          {openLayout && (
-            <div>
-              <button
-                type="button"
-                onClick={() => onToggleChain(openLayout.chain.id)}
-                className="absolute z-10 -translate-x-1/2 rounded-full border border-hair bg-white px-2.5 py-[3px] text-[10.5px] font-medium text-muted hover:border-[#c8d9f7] hover:text-ink"
-                style={{
-                  left: (openLayout.layout.minX + openLayout.layout.maxX) / 2,
-                  top: openLayout.chain.direction === 'below'
-                    ? openLayout.layout.maxY + 10
-                    : Math.max(2, openLayout.layout.minY - 24),
-                }}
-              >
-                {openLayout.chain.title} · close
-              </button>
-              {openLayout.layout.levels.map((lv) => (
-                <ChainNodeCard key={lv.node.id} node={lv.node} x={lv.nodeX} y={lv.y} h={nodeH}
-                  selected={selectedNodeId === lv.node.id} onSelect={onSelectNode} />
-              ))}
-            </div>
-          )}
         </div>
       </div>
     </div>

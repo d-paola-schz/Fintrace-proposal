@@ -12,11 +12,11 @@ import { STATUS_LABEL } from '../lib/format'
 // a column of cards. A node sits on each level and interrupts the strand: the
 // strand meets one edge of the node and resumes at the opposite edge.
 
-export const NODE_W = 272
+export const NODE_W = 250
 /** Comfortable node height. Short viewports shrink this — see ChainMetrics. */
-export const NODE_H = 60
+export const NODE_H = 44
 /** Node height when vertical room is tight (720p projectors, 768p laptops). */
-export const NODE_H_COMPACT = 48
+export const NODE_H_COMPACT = 38
 const TURN = 15 // corner radius of a switchback turn
 
 export interface ChainMetrics {
@@ -260,6 +260,7 @@ export function ChainNodeCard({
   y,
   h = NODE_H,
   selected,
+  dimmed,
   onSelect,
 }: {
   node: ChainNode
@@ -267,18 +268,20 @@ export function ChainNodeCard({
   y: number
   h?: number
   selected: boolean
+  /** True while another chain has focus, so this one recedes without hiding. */
+  dimmed?: boolean
   onSelect: (id: string) => void
 }) {
-  const compact = h < NODE_H
   const t = TONE_STYLE[node.tone]
   return (
     <button
       type="button"
       onClick={() => onSelect(node.id)}
       aria-pressed={selected}
-      className={`absolute rounded-lg border text-left transition-shadow ${t.border} ${
+      title={node.summary}
+      className={`absolute rounded-lg border text-left transition-all ${t.border} ${
         selected ? 'shadow-[0_0_0_2px_var(--color-flow)] z-20' : 'hover:shadow-md z-10'
-      }`}
+      } ${dimmed && !selected ? 'opacity-55' : 'opacity-100'}`}
       style={{
         left: x - NODE_W / 2,
         top: y - h / 2,
@@ -287,28 +290,21 @@ export function ChainNodeCard({
         background: t.fill,
       }}
     >
-      <span className="flex h-full items-center gap-2 px-2.5 py-1">
+      <span className="flex h-full items-center gap-2 px-2.5">
         <span
-          className="tnum flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
+          className="tnum flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[9.5px] font-bold text-white"
           style={{ background: t.stroke }}
         >
-          {String(node.sequence).padStart(2, '0')}
+          {node.sequence}
         </span>
         <span className="min-w-0 flex-1">
-          <span className={`flex items-center gap-1 text-[9.5px] font-semibold uppercase tracking-[0.07em] ${t.text}`}>
+          <span className="block truncate text-[12.5px] font-semibold leading-tight text-ink">
+            {node.title}
+          </span>
+          <span className={`flex items-center gap-1 text-[9.5px] font-semibold uppercase tracking-[0.06em] ${t.text}`}>
             <ToneMark tone={node.tone} size={7} />
             {STATUS_LABEL[node.status]}
           </span>
-          <span className="mt-[1px] block text-[12px] font-semibold leading-[1.25] text-ink line-clamp-2">
-            {node.title}
-          </span>
-          {/* The summary is the first thing to go when height is scarce; the
-              title and the tone still carry the meaning. */}
-          {!compact && (
-            <span className="mt-[1px] block truncate text-[10px] leading-tight text-muted">
-              {node.summary}
-            </span>
-          )}
         </span>
       </span>
     </button>

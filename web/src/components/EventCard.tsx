@@ -26,6 +26,7 @@ export function EventCard({
   hasChain,
   highlighted,
   selected,
+  muted,
   onSelect,
 }: {
   event: FinancialEvent
@@ -35,6 +36,8 @@ export function EventCard({
   hasChain: boolean
   highlighted: boolean
   selected: boolean
+  /** Repeated, non-cash markers recede so the money events lead the eye. */
+  muted?: boolean
   onSelect: (id: string) => void
 }) {
   const accent = KIND_ACCENT[event.kind] ?? '#5a6675'
@@ -46,12 +49,14 @@ export function EventCard({
       type="button"
       onClick={() => onSelect(event.id)}
       aria-pressed={selected}
-      className={`absolute rounded-md border bg-white text-left transition-shadow ${
+      className={`absolute rounded-md border text-left transition-all ${
         selected
-          ? 'shadow-[0_0_0_2px_var(--color-flow)] z-20 border-transparent'
+          ? 'shadow-[0_0_0_2px_var(--color-flow)] z-20 border-transparent bg-white'
           : highlighted
-            ? 'border-[#c8d9f7] shadow-sm z-10'
-            : 'border-hair hover:shadow-md'
+            ? 'border-[#c8d9f7] bg-white shadow-sm z-10'
+            : muted
+              ? 'border-hair bg-[#fafbfc] opacity-75 hover:opacity-100 hover:shadow-sm'
+              : 'border-hair bg-white hover:shadow-md'
       }`}
       style={{
         left: x - CARD_W / 2,
