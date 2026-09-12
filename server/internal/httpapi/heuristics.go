@@ -28,6 +28,34 @@ var months = map[string]time.Month{
 	"sep": time.September, "oct": time.October, "nov": time.November, "dec": time.December,
 }
 
+// domainVocabulary is the closed set of words that make a question plausibly
+// about this workspace. The two generic fallbacks below (an open node, or no
+// match at all) may only claim a question when it contains at least one of
+// these — otherwise a question with nothing to do with cash, sales or the
+// selected node (e.g. "what's the weather?") would silently be answered as if
+// it were about whatever node happened to be open.
+var domainVocabulary = []string{
+	"cash", "balance", "reserve", "spend", "spending", "invest", "investment",
+	"afford", "buy", "payout", "supplier", "rent", "ad", "ads", "campaign",
+	"marketing", "sale", "sales", "revenue", "order", "orders", "item", "items",
+	"business", "doing", "health", "summary", "overview", "node", "chain",
+	"evidence", "source", "sources", "margin", "profit", "stock", "inventory",
+	"reorder", "restock", "unit", "units", "delay", "delayed", "late",
+	"projection", "scenario", "alternative", "compare", "instead", "proposal",
+	"expenditure", "purchase", "money", "dollar", "dollars", "price", "cost",
+	"timeline", "chart", "breach", "shortfall", "gap",
+}
+
+func inDomain(l string) bool { return containsAny(l, domainVocabulary...) }
+
+// isShortFollowUp treats a short question ("why?", "explain this", "tell me
+// more") as belonging to whatever node is already open, since it plainly
+// isn't standing on its own. A longer question gets no such benefit of the
+// doubt — it must actually mention the domain.
+func isShortFollowUp(q string) bool {
+	return len(strings.Fields(strings.TrimSpace(q))) <= 3
+}
+
 func heuristicIntent(q, nodeID string) ai.Intent {
 	l := strings.ToLower(q)
 	switch {
@@ -53,12 +81,14 @@ func heuristicIntent(q, nodeID string) ai.Intent {
 			return ai.IntentExplainNode
 		}
 		return ai.IntentCompanySummary
-	case nodeID != "":
+	case nodeID != "" && (inDomain(l) || isShortFollowUp(q)):
 		return ai.IntentExplainNode
 	case containsAny(l, "how is", "how are", "doing", "summary", "overview", "health"):
 		return ai.IntentCompanySummary
+	case inDomain(l):
+		return ai.IntentCompanySummary
 	}
-	return ai.IntentCompanySummary
+	return ai.IntentUnsupported
 }
 
 func containsAny(s string, subs ...string) bool {

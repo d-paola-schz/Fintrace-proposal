@@ -16,9 +16,16 @@ import (
 	"github.com/preflight/preflight/server/internal/contracts"
 )
 
-// DefaultGeminiModel is a free-tier model on the Gemini developer API. Confirm
-// current free-tier eligibility for the project before a public deployment.
-const DefaultGeminiModel = "gemini-3.6-flash"
+// DefaultGeminiModel is a free-tier model on the Gemini developer API.
+// gemini-3.1-flash-lite was chosen deliberately over the plain "flash" tier:
+// this app only ever asks the model to rephrase facts it already computed, a
+// task the lite tier handles fine, and the free-tier quota difference is not
+// marginal — 500 requests/day against 20 for gemini-3.6-flash, the kind of gap
+// that can exhaust a demo mid-presentation. It also does not spend hidden
+// "thinking" tokens, so a low maxOutputTokens budget cannot starve the visible
+// answer the way it did on gemini-3.6-flash. Confirm current free-tier limits
+// for the project's own key before a public deployment; they change over time.
+const DefaultGeminiModel = "gemini-3.1-flash-lite"
 
 type Gemini struct {
 	key   string
@@ -115,8 +122,14 @@ func (g *Gemini) call(ctx context.Context, system, user string, jsonOut bool, ma
 		Config: geminiGenConfig{
 			Temperature:     0.1,
 			MaxOutputTokens: maxTokens,
-			ThinkingConfig:  &geminiThinkingConf{ThinkingLevel: "low"},
 		},
+	}
+	// "-lite" models do not spend hidden reasoning tokens unless asked to, and
+	// sending thinkingConfig at all switches that on, which then competes with
+	// maxOutputTokens for the same budget as it did on gemini-3.6-flash. Only
+	// the non-lite tier needs to be told to keep it minimal.
+	if !strings.HasSuffix(g.model, "-lite") {
+		body.Config.ThinkingConfig = &geminiThinkingConf{ThinkingLevel: "low"}
 	}
 	if system != "" {
 		body.System = &geminiContent{Parts: []geminiPart{{Text: system}}}
@@ -357,7 +370,10 @@ func (g *Gemini) Verify(ctx context.Context) error {
 	if g.key == "" {
 		return ErrUnavailable
 	}
-	out, err := g.call(ctx, "Reply with the single word: ok", "Reply with the single word: ok", false, 64)
+	// Even at thinkingLevel "low", the model's hidden reasoning consumes a
+	// variable, non-zero share of maxOutputTokens per call — 64 was tight
+	// enough to fail intermittently. 256 leaves headroom for one word.
+	out, err := g.call(ctx, "Reply with the single word: ok", "Reply with the single word: ok", false, 256)
 	if err != nil {
 		return err
 	}
@@ -369,7 +385,9 @@ func (g *Gemini) Verify(ctx context.Context) error {
 }
 
 func (g *Gemini) Route(ctx context.Context, question, nodeID string) (Extraction, error) {
-	out, err := g.call(ctx, routeSystem, "Question: "+question, true, 200)
+	// Same headroom concern as Verify: 200 was tight enough for hidden
+	// reasoning to occasionally crowd out the JSON body entirely.
+	out, err := g.call(ctx, routeSystem, "Question: "+question, true, 400)
 	if err != nil {
 		return Extraction{}, err
 	}
