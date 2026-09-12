@@ -75,6 +75,20 @@ func FindFirstBreachingDelay(in Input, horizonDays int) contracts.DelayBreakpoin
 	base := in.Events
 	bp := contracts.DelayBreakpoint{TestedUpToDays: horizonDays}
 
+	// Delay zero first. If the plan already breaches with the payout on time,
+	// the delay is not what breaks it, and saying "a 1-day delay breaks this"
+	// would be false.
+	if r := Project(in); r.BreachesReserve {
+		bp.Found = true
+		bp.DelayDays = 0
+		bp.BreachDate = r.FirstBreachDate
+		bp.LowestCents = r.LowestCents
+		bp.Explanation = fmt.Sprintf(
+			"Even with the payout arriving on time, projected cash falls below the %s reserve on %s, reaching %s. A payout delay is not what breaks this plan.",
+			FormatUSD(in.ReserveCents), HumanDate(r.FirstBreachDate), FormatUSD(r.LowestCents))
+		return bp
+	}
+
 	for d := 1; d <= horizonDays; d++ {
 		trial := in
 		trial.Events = ShiftPayouts(base, d)
