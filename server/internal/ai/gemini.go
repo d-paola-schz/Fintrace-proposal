@@ -62,8 +62,10 @@ func (g *Gemini) Status() contracts.SourceStatus {
 		st.AsOf = g.lastOK.UTC().Format(time.RFC3339)
 		st.Detail = fmt.Sprintf("Gemini %s answered successfully. It only phrases engine output.", g.model)
 	default:
-		st.State = "live"
-		st.Detail = fmt.Sprintf("Gemini %s configured, not yet called this run.", g.model)
+		// A key in the environment proves nothing. Until a call has actually
+		// succeeded this is "configured", never "live".
+		st.State, st.Degraded = "configured", true
+		st.Detail = fmt.Sprintf("Gemini %s has a key configured but no call has succeeded yet, so it is not confirmed working. Hit /api/probe to verify it.", g.model)
 	}
 	return st
 }
@@ -218,6 +220,23 @@ Extraction rules, applied strictly:
 - Never invent an amount or a date. A missing value is better than a guessed one.`
 
 var jsonFence = regexp.MustCompile("(?s)```(?:json)?(.*?)```")
+
+// Verify sends the smallest useful request. Success flips the status from
+// "configured" to "live"; failure records why, in words safe to show.
+func (g *Gemini) Verify(ctx context.Context) error {
+	if g.key == "" {
+		return ErrUnavailable
+	}
+	out, err := g.call(ctx, "Reply with the single word: ok", "Reply with the single word: ok", false, 16)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(out) == "" {
+		g.fail("Gemini returned an empty verification response")
+		return ErrUnavailable
+	}
+	return nil
+}
 
 func (g *Gemini) Route(ctx context.Context, question, nodeID string) (Extraction, error) {
 	out, err := g.call(ctx, routeSystem, "Question: "+question, true, 200)

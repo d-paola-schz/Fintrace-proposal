@@ -121,9 +121,18 @@ export interface SourceRecord {
   origin?: string
 }
 
+/**
+ * State vocabulary, in descending order of confidence:
+ *   live         a real call to the dependency succeeded this run
+ *   configured   credentials present but NO call has succeeded yet — never
+ *                present this as connected
+ *   snapshot     prepared data captured from a real source at a known time
+ *   fixture      values we wrote ourselves; never retrieved from the dependency
+ *   unavailable  not usable at all
+ */
 export interface SourceStatus {
   name: 'olist' | 'nessie' | 'ai'
-  state: 'live' | 'snapshot' | 'fixture' | 'unavailable'
+  state: 'live' | 'configured' | 'snapshot' | 'fixture' | 'unavailable'
   detail: string
   asOf?: string
   degraded: boolean

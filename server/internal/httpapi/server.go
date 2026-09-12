@@ -36,6 +36,7 @@ func New(store *data.Store, nessie *data.NessieClient, provider ai.Provider, web
 func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", s.handleHealth)
+	mux.HandleFunc("GET /api/probe", s.handleProbe)
 	mux.HandleFunc("GET /api/workspace", s.handleWorkspace)
 	mux.HandleFunc("POST /api/scenarios", s.handleScenario)
 	mux.HandleFunc("POST /api/chat", s.handleChat)

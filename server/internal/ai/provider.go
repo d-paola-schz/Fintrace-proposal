@@ -66,6 +66,9 @@ type Provider interface {
 	Explain(ctx context.Context, prompt Prompt) (string, error)
 	// Route classifies a question and extracts only fields the user supplied.
 	Route(ctx context.Context, question string, nodeID string) (Extraction, error)
+	// Verify makes one minimal real call so the product can state whether the
+	// integration actually works, rather than that a key exists.
+	Verify(ctx context.Context) error
 }
 
 // Prompt carries the engine's own words. Facts is a pre-rendered list of
@@ -113,6 +116,7 @@ func (u *Unavailable) Status() contracts.SourceStatus {
 	}
 }
 func (u *Unavailable) Explain(context.Context, Prompt) (string, error) { return "", ErrUnavailable }
+func (u *Unavailable) Verify(context.Context) error                    { return ErrUnavailable }
 func (u *Unavailable) Route(context.Context, string, string) (Extraction, error) {
 	return Extraction{}, ErrUnavailable
 }

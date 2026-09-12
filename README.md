@@ -109,7 +109,7 @@ deliberately departs from it:
 ## Tests
 
 ```bash
-go test ./server/...                               # 37 tests
+go test ./server/...                               # 43 tests
 python3 -m venv .venv && .venv/bin/pip install duckdb
 .venv/bin/python scripts/verify_attribution.py     # data attribution checks
 ```
@@ -138,12 +138,52 @@ python3 -m venv .venv && .venv/bin/pip install duckdb
 This writes the small versioned `data/olist-seller-summary.json` that the Go
 service loads. Nothing Python runs during the demo.
 
+## Is it actually connected?
+
+A key in the environment is not evidence that an integration works, so the app
+never reports one as `live` until a real call has succeeded. The status
+vocabulary, in descending order of confidence:
+
+| State | Meaning |
+| --- | --- |
+| `live` | a real call to the dependency succeeded this run |
+| `configured` | credentials present, **no call has succeeded yet** — do not present as connected |
+| `snapshot` | prepared data captured from a real source at a known time (Olist) |
+| `fixture` | values we wrote ourselves; never retrieved from the dependency |
+| `unavailable` | not usable at all |
+
+`GET /api/probe` makes **one real call to each external dependency** and reports
+what happened. It returns no secrets, no balances and no full account ids. Run
+it right after setting keys on the host, and again before presenting:
+
+```bash
+curl -s https://<your-service>.onrender.com/api/probe | jq
+```
+
+The header chips and the **Data sources** panel show the same states in the UI,
+and anything not `live` is explicitly marked *"Not confirmed connected — do not
+present this as a live integration."*
+
+Whatever the external state, the deterministic engine, the timeline, the chains
+and every figure keep working. Nessie falls back to the labelled fixture; chat
+falls back to engine-authored answers marked *"AI explanation unavailable"*.
+
 ## Deploy
 
 One Render Free web service built from the included `Dockerfile`
-(see `render.yaml`). Health check: `/api/health`. Set `NESSIE_API_KEY`,
-`NESSIE_ACCOUNT_ID` and `GEMINI_API_KEY` in the Render dashboard — never in the
-repository.
+(see `render.yaml`). Health check: `/api/health`.
+
+1. Render → **New → Web Service** → connect this repo.
+2. Branch: `integration/preflight-app`. Runtime **Docker**, plan **Free**.
+   `render.yaml` already declares this if you use a Blueprint instead.
+3. Add the keys under **Environment** in the Render dashboard — never in the
+   repository, never in chat: `NESSIE_API_KEY`, `NESSIE_ACCOUNT_ID`,
+   `GEMINI_API_KEY`. `AI_PROVIDER=gemini` is set by the blueprint.
+4. After the deploy finishes, hit `/api/probe` and confirm each dependency
+   reports `connected: true` before describing it as connected.
+
+**Render Free sleeps after about 15 minutes idle and takes roughly a minute to
+wake.** Open the URL before presenting, and again shortly before judges do.
 
 ## Documentation
 
