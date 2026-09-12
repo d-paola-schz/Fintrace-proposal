@@ -195,14 +195,33 @@ export default function App() {
   )
 }
 
+// Only a verified call earns green. "configured" means a key exists and nothing
+// has been proven, so it reads amber like every other unconfirmed state.
+const STATE_COLOUR: Record<SourceStatus['state'], string> = {
+  live: '#15803d',
+  configured: '#9a7412',
+  snapshot: '#9a7412',
+  fixture: '#9a7412',
+  unavailable: '#a35b2a',
+}
+
+const STATE_WORD: Record<SourceStatus['state'], string> = {
+  live: 'live',
+  configured: 'unverified',
+  snapshot: 'snapshot',
+  fixture: 'fixture',
+  unavailable: 'unavailable',
+}
+
 function StatusDot({ status }: { status: SourceStatus }) {
-  const colour =
-    status.state === 'live' ? '#15803d' : status.state === 'unavailable' ? '#a35b2a' : '#9a7412'
   return (
     <span className="flex items-center gap-1.5" title={status.detail}>
-      <span className="h-[7px] w-[7px] rounded-full" style={{ background: colour }} />
+      <span
+        className="h-[7px] w-[7px] shrink-0 rounded-full"
+        style={{ background: STATE_COLOUR[status.state] ?? '#9a7412' }}
+      />
       <span className="text-[10.5px] uppercase tracking-[0.05em] text-muted">
-        {status.name} {status.state}
+        {status.name} {STATE_WORD[status.state] ?? status.state}
       </span>
     </span>
   )
@@ -221,11 +240,28 @@ function SourcePanel({ ws, onClose }: { ws: WorkspaceResponse; onClose: () => vo
       </div>
       <div className="mt-2 grid gap-2 md:grid-cols-3">
         {ws.sourceStatus.map((s) => (
-          <div key={s.name} className="rounded-lg border border-hair bg-white p-2.5">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink">
-              {s.name} · {s.state}
+          <div
+            key={s.name}
+            className={`rounded-lg border p-2.5 ${
+              s.state === 'live' ? 'border-[#c2e2ce] bg-[#f4fbf7]' : 'border-hair bg-white'
+            }`}
+          >
+            <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink">
+              <span
+                className="h-[7px] w-[7px] shrink-0 rounded-full"
+                style={{ background: STATE_COLOUR[s.state] ?? '#9a7412' }}
+              />
+              {s.name} · {STATE_WORD[s.state] ?? s.state}
             </p>
             <p className="mt-1 text-[10.5px] leading-snug text-muted">{s.detail}</p>
+            {/* Only the external dependencies can be mis-sold as connected.
+                Olist is a prepared offline snapshot of a public dataset, which
+                is exactly what it claims to be. */}
+            {(s.state === 'configured' || s.state === 'fixture' || s.state === 'unavailable') && (
+              <p className="mt-1 text-[10px] font-medium text-[#8a6d1f]">
+                Not confirmed connected — do not present this as a live integration.
+              </p>
+            )}
           </div>
         ))}
       </div>

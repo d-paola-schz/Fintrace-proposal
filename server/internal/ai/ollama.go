@@ -130,6 +130,19 @@ func (o *Ollama) Explain(ctx context.Context, p Prompt) (string, error) {
 	return out, nil
 }
 
+// Verify sends the smallest useful request to the local model.
+func (o *Ollama) Verify(ctx context.Context) error {
+	out, err := o.chat(ctx, "Reply with the single word: ok", "Reply with the single word: ok", false)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(out) == "" {
+		o.fail("empty verification response")
+		return ErrUnavailable
+	}
+	return nil
+}
+
 func (o *Ollama) Route(ctx context.Context, question, nodeID string) (Extraction, error) {
 	out, err := o.chat(ctx, routeSystem, "Question: "+question, true)
 	if err != nil {

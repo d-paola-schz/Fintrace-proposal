@@ -25,6 +25,48 @@ func (s *Server) builder(ctx context.Context) *workspace.Builder {
 	return &workspace.Builder{Store: s.store, Nessie: snap, Today: finance.Day(time.Now().In(loc))}
 }
 
+// handleProbe makes one real call to each external dependency and reports what
+// happened. It is the answer to "is this actually connected, or just
+// configured?" — run it right after setting keys on the host, and again before
+// presenting. It returns no secrets, no balances and no full account ids.
+func (s *Server) handleProbe(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
+	defer cancel()
+
+	type result struct {
+		Name      string `json:"name"`
+		Connected bool   `json:"connected"`
+		Detail    string `json:"detail"`
+		Fallback  string `json:"fallback"`
+	}
+	out := struct {
+		CheckedAt string   `json:"checkedAt"`
+		AllLive   bool     `json:"allLive"`
+		Results   []result `json:"results"`
+		Note      string   `json:"note"`
+	}{CheckedAt: time.Now().UTC().Format(time.RFC3339)}
+
+	nDetail, nErr := s.nessie.Verify(ctx)
+	out.Results = append(out.Results, result{
+		Name: "nessie", Connected: nErr == nil, Detail: nDetail,
+		Fallback: "The committed demo fixture supplies the opening balance, labelled as a fixture throughout the UI.",
+	})
+
+	aiDetail := fmt.Sprintf("Provider %q answered a minimal verification request.", s.ai.Name())
+	aiErr := s.ai.Verify(ctx)
+	if aiErr != nil {
+		aiDetail = s.ai.Status().Detail
+	}
+	out.Results = append(out.Results, result{
+		Name: "ai", Connected: aiErr == nil, Detail: aiDetail,
+		Fallback: "Chat answers are written by the Go engine and labelled \"AI explanation unavailable\". Every number is unaffected.",
+	})
+
+	out.AllLive = nErr == nil && aiErr == nil
+	out.Note = "Anything not reported connected here must not be described as connected. The deterministic engine, the timeline, the chains and every figure work regardless."
+	writeJSON(w, http.StatusOK, out)
+}
+
 func (s *Server) handleWorkspace(w http.ResponseWriter, r *http.Request) {
 	b := s.builder(r.Context())
 	resp := b.Build(contracts.ScenarioRequest{})

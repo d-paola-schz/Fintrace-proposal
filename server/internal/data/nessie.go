@@ -244,27 +244,49 @@ func (c *NessieClient) fetch(ctx context.Context) (*NessieSnapshot, error) {
 	return snap, nil
 }
 
+// Verify performs one real read and reports what actually came back. It never
+// returns balances or ids in full, only whether the sandbox answered.
+func (c *NessieClient) Verify(ctx context.Context) (string, error) {
+	if !c.Configured() {
+		return "NESSIE_API_KEY is not set.", fmt.Errorf("not configured")
+	}
+	snap, err := c.fetch(ctx)
+	if err != nil {
+		c.setErr(err.Error())
+		return err.Error(), err
+	}
+	c.mu.Lock()
+	c.cached, c.cachedAt, c.lastErr = snap, time.Now(), ""
+	c.mu.Unlock()
+	return fmt.Sprintf(
+		"Read account %s: balance present, %d deposit(s), %d withdrawal(s), %d bill(s). Fields returned by the API: %s.",
+		redactID(snap.AccountID), len(snap.Deposits), len(snap.Withdrawals), len(snap.Bills),
+		strings.Join(snap.FieldsSeen, ", ")), nil
+}
+
 func (c *NessieClient) Status() contracts.SourceStatus {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	st := contracts.SourceStatus{Name: "nessie"}
 	switch {
 	case !c.Configured():
-		st.State = "snapshot"
+		// The committed file was written by us, not captured from Nessie, so it
+		// is a fixture. Calling it a snapshot would imply we fetched it once.
+		st.State = "fixture"
 		st.Degraded = true
-		st.Detail = "NESSIE_API_KEY not configured — using the committed, dated sandbox snapshot."
+		st.Detail = "NESSIE_API_KEY is not set. The opening balance comes from the committed demo fixture, which was never retrieved from the Nessie API."
 	case c.cached != nil && c.lastErr == "":
 		st.State = "live"
 		st.AsOf = c.cached.AsOf
 		st.Detail = fmt.Sprintf("Live sandbox account %s.", redactID(c.cached.AccountID))
 	case c.lastErr != "":
-		st.State = "snapshot"
+		st.State = "fixture"
 		st.Degraded = true
-		st.Detail = "Nessie read failed — using the committed snapshot. " + c.lastErr
+		st.Detail = "The Nessie read failed, so the opening balance falls back to the committed demo fixture. " + c.lastErr
 	default:
-		st.State = "snapshot"
+		st.State = "configured"
 		st.Degraded = true
-		st.Detail = "Nessie not yet contacted this run."
+		st.Detail = "A Nessie key is configured but no read has succeeded yet this run, so the sandbox is not confirmed connected."
 	}
 	return st
 }
