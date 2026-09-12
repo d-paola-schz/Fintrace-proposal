@@ -1,0 +1,238 @@
+package workspace
+
+import (
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/preflight/preflight/server/internal/contracts"
+	"github.com/preflight/preflight/server/internal/data"
+	"github.com/preflight/preflight/server/internal/finance"
+)
+
+// Build assembles the full workspace for one scenario request.
+func (b *Builder) Build(req contracts.ScenarioRequest) contracts.WorkspaceResponse {
+	events := b.Events()
+	res := b.RunScenario(req, events)
+
+	// The proposal, if any, belongs on the timeline too.
+	displayEvents := events
+	if req.Proposal != nil && req.Proposal.AmountCents > 0 {
+		displayEvents = append(displayEvents, finance.ProposalEvent(*req.Proposal, "USD"))
+	}
+	if req.PayoutDelayDays != 0 {
+		displayEvents = finance.ShiftPayouts(displayEvents, req.PayoutDelayDays)
+	}
+
+	chains := b.BuildChains(res, displayEvents)
+	start, end := b.WindowBounds()
+
+	return contracts.WorkspaceResponse{
+		Business:        b.profile(),
+		DisplayCurrency: b.Store.Assume.DisplayCurrency,
+		Timezone:        b.Store.Assume.BusinessTimezone,
+		Today:           b.offset(0),
+		WindowStart:     start,
+		WindowEnd:       end,
+		Events:          displayEvents,
+		Chains:          chains,
+		Scenario:        res,
+		Assumptions:     b.Assumptions(res),
+		Sources:         b.Sources(),
+		SourceStatus:    nil, // filled by the handler, which owns the clients
+		Alert:           b.alert(res, displayEvents),
+		DataNotice:      "Two unrelated sources. Olist is historical Brazilian marketplace data in BRL, redrawn onto today's calendar. Nessie is unrelated mock banking data. They are never joined into one ledger, and every figure below says which it came from.",
+		GeneratedAt:     time.Now().UTC().Format(time.RFC3339),
+	}
+}
+
+// RunScenario applies the request to the engine. This is the only path by which
+// any number in the product is produced.
+func (b *Builder) RunScenario(req contracts.ScenarioRequest, events []contracts.FinancialEvent) contracts.ScenarioResult {
+	reserve := b.Store.Assume.Reserve.AmountCents
+	if req.ReserveCents > 0 {
+		reserve = req.ReserveCents
+	}
+	horizon := req.HorizonDays
+	if horizon <= 0 {
+		horizon = finance.DefaultHorizonDays
+	}
+
+	// unshifted carries the proposal but keeps the payout on its originally
+	// modeled date. The delay breakpoint is always measured from there, so the
+	// statement "a delay of N days breaks the reserve" means the same thing
+	// however many days the owner has already applied.
+	unshifted := events
+	hasProposal := req.Proposal != nil && req.Proposal.AmountCents > 0
+	if hasProposal {
+		unshifted = append(append([]contracts.FinancialEvent{}, unshifted...),
+			finance.ProposalEvent(*req.Proposal, "USD"))
+	}
+	applied := unshifted
+	if req.PayoutDelayDays != 0 {
+		applied = finance.ShiftPayouts(applied, req.PayoutDelayDays)
+	}
+
+	in := finance.Input{
+		BaselineCents:  b.Nessie.BalanceCents,
+		BaselineAsOf:   b.Nessie.AsOf,
+		BaselineSource: b.baselineSource(),
+		Currency:       "USD",
+		StartDate:      finance.Day(b.Today),
+		HorizonDays:    horizon,
+		ReserveCents:   reserve,
+		Events:         applied,
+	}
+
+	res := finance.Project(in)
+	res.PayoutDelayDays = req.PayoutDelayDays
+
+	delayIn := in
+	delayIn.Events = unshifted
+	res.DelayBreakpoint = finance.FindFirstBreachingDelay(delayIn, finance.DefaultDelayHorizonDays)
+	if hasProposal {
+		p := *req.Proposal
+		p.MinimumReserveCents = reserve
+		res.Proposal = &p
+		end := finance.Day(b.Today).AddDate(0, 0, horizon-1)
+		res.Alternatives = finance.BuildAlternatives(in, p, end)
+	}
+	res.Verdict, res.Caveats = finance.Verdict(res, hasProposal)
+	res.Assumptions = b.Assumptions(res)
+	res.MissingInputs = b.missingInputs(req)
+	res.Claims = b.resultClaims(res)
+	return res
+}
+
+func (b *Builder) baselineSource() string {
+	if b.Nessie.Source == "live" {
+		return "Nessie sandbox account (live read)"
+	}
+	return "Committed demo fixture — not retrieved from Nessie"
+}
+
+func (b *Builder) missingInputs(req contracts.ScenarioRequest) []contracts.MissingInput {
+	var out []contracts.MissingInput
+	if req.Proposal != nil && req.Proposal.AmountCents > 0 {
+		out = append(out, contracts.MissingInput{
+			Field:        "expectedBenefit",
+			Question:     "What do you expect this spend to bring in, and by when?",
+			WhyItMatters: "Preflight can tell you whether the cash survives the month. It cannot tell you whether the spend is worth making, because nothing in the connected records measures what advertising or stock earns back.",
+		})
+	}
+	out = append(out, contracts.MissingInput{
+		Field:        "unitsOnHand",
+		Question:     "How many units of your top product do you currently hold?",
+		WhyItMatters: "It is the one number standing between the recorded sales pattern and a dated stock-out estimate. The Olist release has no inventory table, so it cannot be derived.",
+	})
+	return out
+}
+
+func (b *Builder) resultClaims(res contracts.ScenarioResult) []contracts.Claim {
+	return []contracts.Claim{
+		{
+			ID: "claim-res-baseline", Label: "Opening balance",
+			Display:     finance.FormatUSD(res.BaselineBalanceCents),
+			AmountCents: ptr(res.BaselineBalanceCents), Currency: "USD",
+			Provenance: provenanceOfBaseline(b.Nessie), SourceRefs: []string{"src-nessie-account"},
+			AsOf: res.BaselineAsOf, Note: b.baselineSource() + ". Only future events change it.",
+		},
+		{
+			ID: "claim-res-lowest", Label: "Lowest projected cash",
+			Display:     finance.FormatUSD(res.LowestCents) + " on " + finance.HumanDate(res.LowestDate),
+			AmountCents: ptr(res.LowestCents), Currency: "USD",
+			Provenance: contracts.ProvDerived,
+			SourceRefs: []string{"src-nessie-account", "asm-supplier", "asm-rent", "asm-ads", "asm-payout"},
+			Note:       fmt.Sprintf("The tightest of %d projected days.", len(res.Days)),
+		},
+		{
+			ID: "claim-res-reserve", Label: "Minimum operating reserve",
+			Display: finance.FormatUSD(res.ReserveCents), AmountCents: ptr(res.ReserveCents),
+			Currency: "USD", Provenance: contracts.ProvUserEntered,
+			SourceRefs: []string{"asm-reserve"},
+		},
+		{
+			ID: "claim-res-headroom", Label: "Headroom at the lowest point",
+			Display: finance.FormatUSD(res.HeadroomCents), AmountCents: ptr(res.HeadroomCents),
+			Currency: "USD", Provenance: contracts.ProvDerived,
+			SourceRefs: []string{"asm-reserve"},
+			Note:       "Lowest projected cash minus the reserve. A balance exactly equal to the reserve is not a breach.",
+		},
+	}
+}
+
+func provenanceOfBaseline(n *data.NessieSnapshot) string {
+	if n.Source == "live" {
+		return contracts.ProvNessieSandbox
+	}
+	return contracts.ProvDemoAssumption
+}
+
+func (b *Builder) profile() contracts.BusinessProfile {
+	o := b.Store.Olist
+	cats := make([]string, 0, 3)
+	for i, c := range o.Seller.Categories {
+		if i == 3 {
+			break
+		}
+		cats = append(cats, strings.ReplaceAll(c.Name, "_", " "))
+	}
+	return contracts.BusinessProfile{
+		DisplayName: "Casa Girassol",
+		SellerID:    o.Seller.SellerID,
+		Category:    strings.Join(cats, ", "),
+		Location:    strings.Title(o.Seller.City) + ", " + strings.ToUpper(o.Seller.State),
+		SourceWindow: fmt.Sprintf("%s to %s recorded (%d order items)",
+			o.Seller.FirstSaleDate, o.Seller.LastSaleDate, o.Seller.ItemCount),
+		TimeShiftNote: fmt.Sprintf(
+			"Display name chosen for the demo. The underlying records are Olist seller %s, whose 30 days to %s are redrawn onto the 30 days to today. %s",
+			short(o.Seller.SellerID), o.Window.End, o.WindowSelection.Disclosure),
+	}
+}
+
+func short(id string) string {
+	if len(id) <= 10 {
+		return id
+	}
+	return id[:8] + "…"
+}
+
+// alert points at real future events in the normalized data, never at prose.
+func (b *Builder) alert(res contracts.ScenarioResult, events []contracts.FinancialEvent) *contracts.WorkspaceAlert {
+	supplier, ok := findEvent(events, "evt-asm-supplier")
+	payout, ok2 := findEvent(events, "evt-payout")
+	if !ok || !ok2 {
+		return nil
+	}
+	bp := res.DelayBreakpoint
+	if res.BreachesReserve {
+		return &contracts.WorkspaceAlert{
+			Tone: contracts.ToneRisk,
+			Message: fmt.Sprintf(
+				"Projected cash falls below your %s reserve on %s, reaching %s on %s. Open the payout chain to see what moves it.",
+				finance.FormatUSD(res.ReserveCents), finance.HumanDate(res.FirstBreachDate),
+				finance.FormatUSD(res.LowestCents), finance.HumanDate(res.LowestDate)),
+			EventIDs: []string{supplier.ID, payout.ID}, ChainID: "chain-payout",
+			FocusNodeID: "node-payout-2",
+		}
+	}
+	if bp.Found {
+		return &contracts.WorkspaceAlert{
+			Tone: contracts.ToneReview,
+			Message: fmt.Sprintf(
+				"Your %s supplier payment on %s falls before the %s payout expected %s. A payout delay of %d days or more would drop you below your %s reserve on %s.",
+				finance.FormatUSD(-supplier.AmountCents), finance.HumanDate(supplier.Date),
+				finance.FormatUSD(payout.AmountCents), finance.HumanDate(payout.Date),
+				bp.DelayDays, finance.FormatUSD(res.ReserveCents), finance.HumanDate(bp.BreachDate)),
+			EventIDs: []string{supplier.ID, payout.ID}, ChainID: "chain-payout",
+			FocusNodeID: "node-payout-2",
+		}
+	}
+	return &contracts.WorkspaceAlert{
+		Tone: contracts.ToneOpportunity,
+		Message: fmt.Sprintf(
+			"Projected cash holds above your %s reserve for the full window, and no payout delay up to %d days changes that.",
+			finance.FormatUSD(res.ReserveCents), bp.TestedUpToDays),
+		EventIDs: []string{payout.ID}, ChainID: "chain-payout", FocusNodeID: "node-payout-2",
+	}
+}
