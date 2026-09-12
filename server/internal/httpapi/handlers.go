@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -30,6 +31,16 @@ func (s *Server) builder(ctx context.Context) *workspace.Builder {
 // configured?" — run it right after setting keys on the host, and again before
 // presenting. It returns no secrets, no balances and no full account ids.
 func (s *Server) handleProbe(w http.ResponseWriter, r *http.Request) {
+	s.probeMu.Lock()
+	defer s.probeMu.Unlock()
+	if s.probeBody != nil && time.Since(s.probeAt) < probeTTL {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("X-Probe-Cached", "true")
+		_, _ = w.Write(s.probeBody)
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
 	defer cancel()
 
@@ -63,8 +74,17 @@ func (s *Server) handleProbe(w http.ResponseWriter, r *http.Request) {
 	})
 
 	out.AllLive = nErr == nil && aiErr == nil
-	out.Note = "Anything not reported connected here must not be described as connected. The deterministic engine, the timeline, the chains and every figure work regardless."
-	writeJSON(w, http.StatusOK, out)
+	out.Note = "Anything not reported connected here must not be described as connected. The deterministic engine, the timeline, the chains and every figure work regardless. This result is cached for 30 seconds so repeated checks cannot burn a free-tier quota."
+
+	body, err := json.Marshal(out)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "could not encode the probe result")
+		return
+	}
+	s.probeBody, s.probeAt = body, time.Now()
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = w.Write(body)
 }
 
 func (s *Server) handleWorkspace(w http.ResponseWriter, r *http.Request) {

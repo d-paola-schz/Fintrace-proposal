@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/preflight/preflight/server/internal/ai"
@@ -27,7 +28,17 @@ type Server struct {
 	ai        ai.Provider
 	startedAt time.Time
 	webDir    string
+
+	// probeMu guards a short cache of the last probe. The endpoint is public
+	// and makes real upstream calls, so repeated hits must not burn a
+	// free-tier quota or hammer the sandbox.
+	probeMu   sync.Mutex
+	probeAt   time.Time
+	probeBody []byte
 }
+
+// probeTTL is how long a probe result is reused before calling upstream again.
+const probeTTL = 30 * time.Second
 
 func New(store *data.Store, nessie *data.NessieClient, provider ai.Provider, webDir string) *Server {
 	return &Server{store: store, nessie: nessie, ai: provider, startedAt: time.Now(), webDir: webDir}
