@@ -61,59 +61,57 @@ export function layoutChain(
 ): ChainLayout {
   const { run: RUN, levelGap: LEVEL_GAP, firstLevel: FIRST_LEVEL, nodeH } = metrics
   const sign = flip ? -1 : 1
-  const xA = anchorX
-  const xB = anchorX + sign * RUN
+
+  // The chain hangs centred under its root event: the runs extend half a run
+  // each side of the anchor, and every node is centred on the anchor itself.
+  // The strand drops straight down from the rail into node 01, then folds.
+  const mid = anchorX
+  const xA = anchorX - RUN / 2
+  const xB = anchorX + RUN / 2
 
   const levelY = (i: number) => anchorY + dir * (FIRST_LEVEL + i * LEVEL_GAP)
-  const mid = (xA + xB) / 2
 
   const nodes = [...chain.nodes].sort((a, b) => a.sequence - b.sequence).slice(0, 3)
   const levels = nodes.map((node, i) => ({ y: levelY(i), nodeX: mid, node }))
 
-  // Edges of the node box on a given level.
   const leftEdge = mid - NODE_W / 2
   const rightEdge = mid + NODE_W / 2
-  // Outer/inner relative to the run direction.
-  const entry = sign > 0 ? leftEdge : rightEdge
-  const exit = sign > 0 ? rightEdge : leftEdge
 
   const toneOf = (from: number, to: number): Tone =>
     chain.segments.find((s) => s.fromSequence === from && s.toSequence === to)?.tone ?? 'review'
 
   const segments: ChainLayout['segments'] = []
   const r = TURN * dir
-  const rx = TURN * sign
 
-  // Root -> node 1: drop away from the axis, turn, run inward to the node edge.
+  // Root -> node 1: a plumb drop from the rail to the top edge of the node.
   if (levels[0]) {
     const y1 = levels[0].y
     segments.push({
       key: 'seg-0-1',
       tone: toneOf(0, 1),
-      d: `M ${xA} ${anchorY} L ${xA} ${y1 - r} Q ${xA} ${y1} ${xA + rx} ${y1} L ${entry} ${y1}`,
+      d: `M ${anchorX} ${anchorY} L ${anchorX} ${y1 - dir * (nodeH / 2)}`,
     })
   }
 
-  // node i -> node i+1: leave the far edge, run to the side, tight turn, run back.
+  // node i -> node i+1: leave one edge, run out to the side, tight turn, run
+  // back to the same edge of the next node. Sides alternate, which is what
+  // makes the fold read as a switchback.
   for (let i = 0; i + 1 < levels.length; i++) {
     const yFrom = levels[i].y
     const yTo = levels[i + 1].y
-    // Odd levels run in the opposite direction, so entry/exit swap.
-    const forward = i % 2 === 0
-    const start = forward ? exit : entry
-    const end = forward ? exit : entry
-    const corner = forward ? xB : xA
-    const cornerIn = forward ? xB - rx : xA + rx
-    const cornerOut = forward ? xB - rx : xA + rx
+    const outward = i % 2 === 0 ? sign > 0 : sign < 0
+    const corner = outward ? xB : xA
+    const edge = outward ? rightEdge : leftEdge
+    const rx = outward ? TURN : -TURN
     segments.push({
       key: `seg-${i + 1}-${i + 2}`,
       tone: toneOf(i + 1, i + 2),
       d:
-        `M ${start} ${yFrom} L ${cornerIn} ${yFrom} ` +
+        `M ${edge} ${yFrom} L ${corner - rx} ${yFrom} ` +
         `Q ${corner} ${yFrom} ${corner} ${yFrom + r} ` +
         `L ${corner} ${yTo - r} ` +
-        `Q ${corner} ${yTo} ${cornerOut} ${yTo} ` +
-        `L ${end} ${yTo}`,
+        `Q ${corner} ${yTo} ${corner - rx} ${yTo} ` +
+        `L ${edge} ${yTo}`,
     })
   }
 
@@ -139,11 +137,11 @@ export function layoutChain(
  */
 
 /** Geometry of one link, in path-space pixels. */
-const LINK_LEN = 19
-const LINK_FACE_W = 13
-const LINK_EDGE_W = 6
-const LINK_SPACING = 12.5 // < LINK_LEN, so neighbours overlap and interlock
-const LINK_STROKE = 3
+const LINK_LEN = 13
+const LINK_FACE_W = 8.5
+const LINK_EDGE_W = 4
+const LINK_SPACING = 8.6 // < LINK_LEN, so neighbours overlap and interlock
+const LINK_STROKE = 1.9
 
 interface Link {
   x: number
@@ -209,7 +207,7 @@ function ChainSegmentLinks({ d, tone }: { d: string; tone: Tone }) {
               ry={w / 2}
               fill="none"
               stroke="var(--color-paper)"
-              strokeWidth={LINK_STROKE + 2.2}
+              strokeWidth={LINK_STROKE + 1.6}
             />
             <rect
               x={-LINK_LEN / 2}
@@ -227,16 +225,16 @@ function ChainSegmentLinks({ d, tone }: { d: string; tone: Tone }) {
                 a machined edge catching the light */}
             {l.face && (
               <rect
-                x={-LINK_LEN / 2 + 2.4}
-                y={-w / 2 + 1.1}
-                width={LINK_LEN - 4.8}
-                height={w - 2.2}
-                rx={(w - 2.2) / 2}
-                ry={(w - 2.2) / 2}
+                x={-LINK_LEN / 2 + 1.7}
+                y={-w / 2 + 0.8}
+                width={LINK_LEN - 3.4}
+                height={w - 1.6}
+                rx={(w - 1.6) / 2}
+                ry={(w - 1.6) / 2}
                 fill="none"
                 stroke="#ffffff"
-                strokeWidth={0.9}
-                opacity={0.5}
+                strokeWidth={0.7}
+                opacity={0.42}
               />
             )}
           </g>
