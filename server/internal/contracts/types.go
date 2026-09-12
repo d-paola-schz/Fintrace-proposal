@@ -360,6 +360,49 @@ type ChatResponse struct {
 	Unavailable    string           `json:"unavailable,omitempty"`
 }
 
+// Discovery is one thing the language model proposed looking at, after the Go
+// engine has checked it.
+//
+// The division is deliberate and is the whole point: the model may only say
+// WHICH of the events already on the timeline deserve attention and WHY, in
+// words. It may not state a figure, invent an event, or decide severity. Every
+// number attached here is computed by the engine afterwards, and anything the
+// model referenced that does not exist causes the candidate to be rejected and
+// reported as rejected rather than quietly dropped.
+type Discovery struct {
+	ID        string `json:"id"`
+	Title     string `json:"title"`
+	Rationale string `json:"rationale"`
+	// EventRefs are timeline event IDs. Every one is checked to exist.
+	EventRefs []string `json:"eventRefs"`
+	Status    string   `json:"status"` // verified | rejected
+	// RejectedBecause is shown to the user. A silent drop would hide the fact
+	// that the model produced something unusable.
+	RejectedBecause string  `json:"rejectedBecause,omitempty"`
+	Tone            string  `json:"tone,omitempty"`
+	Claims          []Claim `json:"claims"`
+}
+
+// DiscoveryResponse is the result of one model pass over the timeline.
+type DiscoveryResponse struct {
+	Available   bool        `json:"available"`
+	Source      string      `json:"source"` // model | unavailable
+	Unavailable string      `json:"unavailable,omitempty"`
+	Proposed    int         `json:"proposed"`
+	Verified    int         `json:"verified"`
+	Discoveries []Discovery `json:"discoveries"`
+	Note        string      `json:"note"`
+}
+
+// Sanitize fills every nil slice in a discovery reply.
+func (d *DiscoveryResponse) Sanitize() {
+	d.Discoveries = nonNil(d.Discoveries)
+	for i := range d.Discoveries {
+		d.Discoveries[i].EventRefs = nonNil(d.Discoveries[i].EventRefs)
+		d.Discoveries[i].Claims = sanitizeClaims(d.Discoveries[i].Claims)
+	}
+}
+
 // HealthResponse reports readiness without exposing secrets.
 type HealthResponse struct {
 	Status      string         `json:"status"`

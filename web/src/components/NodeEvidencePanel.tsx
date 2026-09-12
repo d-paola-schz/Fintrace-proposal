@@ -7,6 +7,7 @@ import { ContextChart } from './ContextChart'
 import { Chat } from './Chat'
 import { ProvenanceChip, TONE_STYLE, ToneMark } from './Tone'
 import { Section } from './Section'
+import { Discoveries } from './Discoveries'
 
 /** The contextual panel. Selection, title, chart, evidence and chat always
  *  describe the same node — never two different things at once. */
@@ -354,6 +355,10 @@ function OverviewPanel({
             <SourceLink id="src-olist-seller" />
           </div>
         </div>
+      </Section>
+
+      <Section title="Ask the model what to look at" tone="action">
+        <Discoveries scenario={scenario} />
       </Section>
 
       <Section title="Ask about the business" tone="action">

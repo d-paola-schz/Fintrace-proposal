@@ -165,6 +165,62 @@ func (s *Server) handleSource(w http.ResponseWriter, r *http.Request) {
 	writeErr(w, http.StatusNotFound, "no source record with that id")
 }
 
+// handleDiscover runs one model pass over the timeline and returns what
+// survived checking. The model chooses which events belong together and says
+// why; the engine decides whether that is true, attaches every figure, and sets
+// the severity. Candidates that fail are returned as rejected, with the reason,
+// rather than hidden.
+func (s *Server) handleDiscover(w http.ResponseWriter, r *http.Request) {
+	var req contracts.ScenarioRequest
+	if err := decodeBody(w, r, &req); err != nil {
+		writeErr(w, http.StatusBadRequest, "could not read the request body")
+		return
+	}
+	b := s.builder(r.Context())
+	if err := validateScenario(&req, b.Today); err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	ws := b.Build(req)
+	ws.Sanitize()
+
+	resp := contracts.DiscoveryResponse{
+		Note: "The model chose which events to put together and why, in words. Every figure below, and the severity, came from the engine afterwards. Anything the model referred to that does not exist was rejected and is shown as rejected.",
+	}
+
+	if !s.ai.Available() {
+		resp.Source = "unavailable"
+		resp.Unavailable = s.ai.Status().Detail
+		resp.Sanitize()
+		writeJSON(w, http.StatusOK, resp)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
+	defer cancel()
+
+	candidates, err := s.ai.Discover(ctx, b.BuildBrief(ws))
+	if err != nil {
+		resp.Source = "unavailable"
+		resp.Unavailable = s.ai.Status().Detail
+		resp.Sanitize()
+		writeJSON(w, http.StatusOK, resp)
+		return
+	}
+
+	resp.Available = true
+	resp.Source = "model"
+	resp.Proposed = len(candidates)
+	resp.Discoveries = b.Verify(candidates, ws)
+	for _, d := range resp.Discoveries {
+		if d.Status == "verified" {
+			resp.Verified++
+		}
+	}
+	resp.Sanitize()
+	writeJSON(w, http.StatusOK, resp)
+}
+
 func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	var req contracts.ChatRequest
 	if err := decodeBody(w, r, &req); err != nil {

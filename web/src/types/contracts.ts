@@ -283,6 +283,27 @@ export interface ChatResponse {
   unavailable?: string
 }
 
+export interface Discovery {
+  id: string
+  title: string
+  rationale: string
+  eventRefs: string[]
+  status: 'verified' | 'rejected'
+  rejectedBecause?: string
+  tone?: Tone
+  claims: Claim[]
+}
+
+export interface DiscoveryResponse {
+  available: boolean
+  source: 'model' | 'unavailable'
+  unavailable?: string
+  proposed: number
+  verified: number
+  discoveries: Discovery[]
+  note: string
+}
+
 export interface HealthResponse {
   status: string
   version: string

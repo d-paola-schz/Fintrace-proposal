@@ -143,6 +143,33 @@ func (o *Ollama) Verify(ctx context.Context) error {
 	return nil
 }
 
+func (o *Ollama) Discover(ctx context.Context, brief Brief) ([]Candidate, error) {
+	var sb strings.Builder
+	sb.WriteString("Business: " + brief.Business + "\n\nEvents on the timeline:\n")
+	for _, e := range brief.Events {
+		sb.WriteString("- " + e + "\n")
+	}
+	sb.WriteString("\nWhat the calculation engine already found:\n")
+	for _, f := range brief.Findings {
+		sb.WriteString("- " + f + "\n")
+	}
+	out, err := o.chat(ctx, discoverSystem, sb.String(), true)
+	if err != nil {
+		return nil, err
+	}
+	if m := jsonFence.FindStringSubmatch(out); len(m) == 2 {
+		out = strings.TrimSpace(m[1])
+	}
+	var parsed struct {
+		Candidates []Candidate `json:"candidates"`
+	}
+	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
+		o.fail("discovery response was not usable JSON")
+		return nil, ErrUnavailable
+	}
+	return parsed.Candidates, nil
+}
+
 func (o *Ollama) Route(ctx context.Context, question, nodeID string) (Extraction, error) {
 	out, err := o.chat(ctx, routeSystem, "Question: "+question, true)
 	if err != nil {

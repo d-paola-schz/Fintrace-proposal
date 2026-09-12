@@ -23,7 +23,10 @@ const DefaultGeminiModel = "gemini-2.0-flash"
 type Gemini struct {
 	key   string
 	model string
-	http  *http.Client
+	// base is the API root. Overridable so the adapter's failure handling can
+	// be tested against a stub rather than the live service.
+	base string
+	http *http.Client
 
 	mu       sync.RWMutex
 	lastErr  string
@@ -36,9 +39,14 @@ func NewGemini() *Gemini {
 	if model == "" {
 		model = DefaultGeminiModel
 	}
+	base := strings.TrimRight(os.Getenv("GEMINI_BASE_URL"), "/")
+	if base == "" {
+		base = "https://generativelanguage.googleapis.com"
+	}
 	return &Gemini{
 		key:   strings.TrimSpace(os.Getenv("GEMINI_API_KEY")),
 		model: model,
+		base:  base,
 		http:  &http.Client{Timeout: 20 * time.Second},
 	}
 }
@@ -109,7 +117,7 @@ func (g *Gemini) call(ctx context.Context, system, user string, jsonOut bool, ma
 	if err != nil {
 		return "", err
 	}
-	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent", g.model)
+	url := fmt.Sprintf("%s/v1beta/models/%s:generateContent", g.base, g.model)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(buf))
 	if err != nil {
 		return "", err
@@ -126,7 +134,11 @@ func (g *Gemini) call(ctx context.Context, system, user string, jsonOut bool, ma
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if resp.StatusCode != http.StatusOK {
-		g.fail(fmt.Sprintf("HTTP %d from the Gemini API", resp.StatusCode))
+		if resp.StatusCode == http.StatusNotFound {
+			g.fail(g.diagnose(ctx))
+		} else {
+			g.fail(fmt.Sprintf("HTTP %d from the Gemini API", resp.StatusCode))
+		}
 		return "", ErrUnavailable
 	}
 	var parsed struct {
@@ -145,6 +157,66 @@ func (g *Gemini) call(ctx context.Context, system, user string, jsonOut bool, ma
 	}
 	g.succeed()
 	return strings.TrimSpace(parsed.Candidates[0].Content.Parts[0].Text), nil
+}
+
+// ListModels asks the API which models this key can actually use. A 404 from
+// generateContent means the model name is not served to this key, which is
+// otherwise indistinguishable from any other failure — so the adapter answers
+// the question rather than reporting the code.
+func (g *Gemini) ListModels(ctx context.Context) ([]string, error) {
+	if g.key == "" {
+		return nil, ErrUnavailable
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		g.base+"/v1beta/models?pageSize=100", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("x-goog-api-key", g.key)
+	resp, err := g.http.Do(req)
+	if err != nil {
+		return nil, ErrUnavailable
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("listing models returned HTTP %d", resp.StatusCode)
+	}
+	var parsed struct {
+		Models []struct {
+			Name    string   `json:"name"`
+			Methods []string `json:"supportedGenerationMethods"`
+		} `json:"models"`
+	}
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		return nil, ErrUnavailable
+	}
+	var out []string
+	for _, m := range parsed.Models {
+		for _, meth := range m.Methods {
+			if meth == "generateContent" {
+				out = append(out, strings.TrimPrefix(m.Name, "models/"))
+				break
+			}
+		}
+	}
+	return out, nil
+}
+
+// diagnose turns a bare 404 into the actionable answer.
+func (g *Gemini) diagnose(ctx context.Context) string {
+	models, err := g.ListModels(ctx)
+	if err != nil || len(models) == 0 {
+		return fmt.Sprintf("Model %q was not found for this key, and the model list could not be read either. Check the key and the model name.", g.model)
+	}
+	shown := models
+	if len(shown) > 8 {
+		shown = shown[:8]
+	}
+	return fmt.Sprintf(
+		"Model %q is not served to this key. Models this key CAN use: %s%s. Set GEMINI_MODEL to one of them.",
+		g.model, strings.Join(shown, ", "),
+		map[bool]string{true: fmt.Sprintf(" (and %d more)", len(models)-len(shown)), false: ""}[len(models) > len(shown)])
 }
 
 func (g *Gemini) fail(msg string) {
@@ -220,6 +292,53 @@ Extraction rules, applied strictly:
 - Never invent an amount or a date. A missing value is better than a guessed one.`
 
 var jsonFence = regexp.MustCompile("(?s)```(?:json)?(.*?)```")
+
+const discoverSystem = `You are reviewing a small business's cash timeline and choosing what deserves the owner's attention.
+
+You are NOT a calculator and NOT an analyst of record. Another system has already computed every figure. Your only job is to pick which of the listed events matter together, and to say why in plain words.
+
+Reply with JSON only:
+{"candidates":[{"title":"...","rationale":"...","eventRefs":["evt-..."]}]}
+
+Hard rules:
+- Return at most 3 candidates. Fewer is better than padding.
+- eventRefs must contain ONLY ids copied exactly from the supplied event list. Never invent an id.
+- Every candidate must reference at least 2 events. A single event on its own is not an observation.
+- NEVER write a number, amount, date, percentage or currency figure in title or rationale. Refer to events by name instead. A candidate containing a digit will be discarded.
+- Never claim something happened, was paid, or was scheduled beyond what the list says.
+- Never assert a cause you cannot see in the list. Say what the relationship is, not what it proves.
+- title: at most 9 words. rationale: one or two sentences.`
+
+// Discover asks the model which events belong together and why. It returns
+// candidates only; nothing here is trusted until the engine checks it.
+func (g *Gemini) Discover(ctx context.Context, brief Brief) ([]Candidate, error) {
+	var sb strings.Builder
+	sb.WriteString("Business: " + brief.Business + "\n\nEvents on the timeline:\n")
+	for _, e := range brief.Events {
+		sb.WriteString("- " + e + "\n")
+	}
+	sb.WriteString("\nWhat the calculation engine already found:\n")
+	for _, f := range brief.Findings {
+		sb.WriteString("- " + f + "\n")
+	}
+	sb.WriteString("\nWhich of these belong together and deserve attention? Words only, no figures.")
+
+	out, err := g.call(ctx, discoverSystem, sb.String(), true, 700)
+	if err != nil {
+		return nil, err
+	}
+	if m := jsonFence.FindStringSubmatch(out); len(m) == 2 {
+		out = strings.TrimSpace(m[1])
+	}
+	var parsed struct {
+		Candidates []Candidate `json:"candidates"`
+	}
+	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
+		g.fail("discovery response was not usable JSON")
+		return nil, ErrUnavailable
+	}
+	return parsed.Candidates, nil
+}
 
 // Verify sends the smallest useful request. Success flips the status from
 // "configured" to "live"; failure records why, in words safe to show.
