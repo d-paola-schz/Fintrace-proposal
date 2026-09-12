@@ -195,6 +195,40 @@ type ProposedDecision struct {
 	MinimumReserveCents int64  `json:"minimumReserveCents"`
 }
 
+// OutflowOverride replaces one modeled payment with the owner's own figure.
+type OutflowOverride struct {
+	AmountCents *int64  `json:"amountCents,omitempty"`
+	Date        *string `json:"date,omitempty"`
+	// Removed drops the payment entirely: it may simply not apply to them.
+	Removed bool `json:"removed,omitempty"`
+}
+
+// AssumptionOverrides turns the demo's fixed figures into the owner's inputs.
+//
+// Everything here shipped as a constant in data/demo-assumptions.json. Any
+// value the owner supplies replaces it and, just as importantly, changes that
+// figure's provenance from "demo assumption" to "you entered", so the source
+// badges stay truthful as the scenario becomes theirs.
+type AssumptionOverrides struct {
+	// Outflows is keyed by assumption id: asm-supplier, asm-ads, asm-rent.
+	Outflows map[string]OutflowOverride `json:"outflows,omitempty"`
+	// MarketplaceFeePct replaces the modeled commission.
+	MarketplaceFeePct *float64 `json:"marketplaceFeePct,omitempty"`
+	// BRLPerUSD replaces the demo conversion rate.
+	BRLPerUSD *float64 `json:"brlPerUsd,omitempty"`
+	// OpeningBalanceCents replaces the starting cash position.
+	OpeningBalanceCents *int64 `json:"openingBalanceCents,omitempty"`
+}
+
+// Any reports whether the owner has changed anything at all.
+func (a *AssumptionOverrides) Any() bool {
+	if a == nil {
+		return false
+	}
+	return len(a.Outflows) > 0 || a.MarketplaceFeePct != nil ||
+		a.BRLPerUSD != nil || a.OpeningBalanceCents != nil
+}
+
 // ScenarioRequest is the validated input to the deterministic engine.
 type ScenarioRequest struct {
 	Proposal        *ProposedDecision `json:"proposal,omitempty"`
@@ -203,6 +237,8 @@ type ScenarioRequest struct {
 	ReserveCents int64 `json:"reserveCents,omitempty"`
 	// HorizonDays defaults to 30.
 	HorizonDays int `json:"horizonDays,omitempty"`
+	// Assumptions replaces the demo's fixed figures with the owner's own.
+	Assumptions *AssumptionOverrides `json:"assumptions,omitempty"`
 }
 
 // DayBalance is one row of the daily projection.

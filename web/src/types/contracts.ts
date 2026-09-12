@@ -146,11 +146,26 @@ export interface ProposedDecision {
   minimumReserveCents: number
 }
 
+export interface OutflowOverride {
+  amountCents?: number
+  date?: string
+  removed?: boolean
+}
+
+/** Replaces the demo's fixed figures with the owner's own. */
+export interface AssumptionOverrides {
+  outflows?: Record<string, OutflowOverride>
+  marketplaceFeePct?: number
+  brlPerUsd?: number
+  openingBalanceCents?: number
+}
+
 export interface ScenarioRequest {
   proposal?: ProposedDecision | null
   payoutDelayDays: number
   reserveCents?: number
   horizonDays?: number
+  assumptions?: AssumptionOverrides | null
 }
 
 export interface DayBalance {

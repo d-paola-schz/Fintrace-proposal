@@ -106,6 +106,9 @@ func validateScenario(req *contracts.ScenarioRequest, today time.Time) error {
 	if req.HorizonDays < 0 || req.HorizonDays > finance.MaxHorizonDays {
 		return fmt.Errorf("horizonDays must be between 0 and %d", finance.MaxHorizonDays)
 	}
+	if err := validateOverrides(req.Assumptions, today); err != nil {
+		return err
+	}
 	if req.Proposal == nil {
 		return nil
 	}
@@ -125,6 +128,9 @@ func validateScenario(req *contracts.ScenarioRequest, today time.Time) error {
 			return fmt.Errorf("proposal date is beyond the %d-day horizon", finance.MaxHorizonDays)
 		}
 	}
+	if err := validateOverrides(req.Assumptions, today); err != nil {
+		return err
+	}
 	switch p.Category {
 	case "", "marketing", "inventory", "equipment", "other":
 	default:
@@ -132,6 +138,54 @@ func validateScenario(req *contracts.ScenarioRequest, today time.Time) error {
 	}
 	if len(p.Description) > 120 {
 		p.Description = p.Description[:120]
+	}
+	return nil
+}
+
+// validateOverrides bounds every owner-supplied figure before it can reach the
+// engine. An unbounded rate or a date outside the window would produce a
+// projection that is arithmetically fine and completely meaningless.
+func validateOverrides(a *contracts.AssumptionOverrides, today time.Time) error {
+	if a == nil {
+		return nil
+	}
+	if a.MarketplaceFeePct != nil {
+		if *a.MarketplaceFeePct < 0 || *a.MarketplaceFeePct > 90 {
+			return fmt.Errorf("marketplaceFeePct must be between 0 and 90")
+		}
+	}
+	if a.BRLPerUSD != nil {
+		if *a.BRLPerUSD < 0.1 || *a.BRLPerUSD > 100 {
+			return fmt.Errorf("brlPerUsd must be between 0.1 and 100")
+		}
+	}
+	if a.OpeningBalanceCents != nil {
+		if *a.OpeningBalanceCents < 0 || *a.OpeningBalanceCents > 1_000_000_000 {
+			return fmt.Errorf("openingBalanceCents must be between 0 and 1000000000")
+		}
+	}
+	if len(a.Outflows) > 12 {
+		return fmt.Errorf("too many outflow overrides")
+	}
+	for id, o := range a.Outflows {
+		if !strings.HasPrefix(id, "asm-") || len(id) > 40 {
+			return fmt.Errorf("unknown assumption id %q", id)
+		}
+		if o.AmountCents != nil && (*o.AmountCents > 0 || *o.AmountCents < -100_000_000) {
+			return fmt.Errorf("%s amountCents must be a negative amount no larger than 100000000", id)
+		}
+		if o.Date != nil {
+			d, err := finance.ParseDate(*o.Date)
+			if err != nil {
+				return fmt.Errorf("%s date: %w", id, err)
+			}
+			if d.Before(finance.Day(today).AddDate(0, 0, -1)) {
+				return fmt.Errorf("%s cannot be dated in the past", id)
+			}
+			if d.After(finance.Day(today).AddDate(0, 0, finance.MaxHorizonDays)) {
+				return fmt.Errorf("%s is beyond the %d-day horizon", id, finance.MaxHorizonDays)
+			}
+		}
 	}
 	return nil
 }

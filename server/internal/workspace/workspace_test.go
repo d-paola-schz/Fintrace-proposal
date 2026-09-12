@@ -501,3 +501,100 @@ func TestNoProposalMeansNoComparison(t *testing.T) {
 		t.Fatalf("delta = %d with no proposal", ws.Scenario.DeltaLowestCents)
 	}
 }
+
+// Every figure the demo ships as a constant must be replaceable by the owner,
+// and the projection must actually change when it is.
+func TestOwnerFiguresReplaceTheDemoConstants(t *testing.T) {
+	b := testBuilder(t)
+	base := b.Build(contracts.ScenarioRequest{})
+
+	balance := int64(900_000)
+	fee := 8.0
+	fx := 5.6
+	supplier := int64(-620_000)
+	date := b.Today.AddDate(0, 0, 6).Format(finance.DateLayout)
+
+	edited := b.Build(contracts.ScenarioRequest{
+		Assumptions: &contracts.AssumptionOverrides{
+			OpeningBalanceCents: &balance,
+			MarketplaceFeePct:   &fee,
+			BRLPerUSD:           &fx,
+			Outflows: map[string]contracts.OutflowOverride{
+				"asm-supplier": {AmountCents: &supplier, Date: &date},
+				"asm-rent":     {Removed: true},
+			},
+		},
+	})
+
+	if edited.Scenario.BaselineBalanceCents != balance {
+		t.Errorf("baseline = %d, want %d", edited.Scenario.BaselineBalanceCents, balance)
+	}
+	if edited.Scenario.LowestCents == base.Scenario.LowestCents {
+		t.Error("changing the inputs did not change the projection")
+	}
+
+	find := func(ws contracts.WorkspaceResponse, id string) *contracts.FinancialEvent {
+		for i := range ws.Events {
+			if ws.Events[i].ID == id {
+				return &ws.Events[i]
+			}
+		}
+		return nil
+	}
+	sup := find(edited, "evt-asm-supplier")
+	if sup == nil || sup.AmountCents != supplier || sup.Date != date {
+		t.Errorf("supplier payment not replaced: %+v", sup)
+	}
+	if find(edited, "evt-asm-rent") != nil {
+		t.Error("a removed payment must not stay on the timeline")
+	}
+	// A lower fee leaves more of the same recorded revenue to pay out.
+	if find(edited, "evt-payout").AmountCents == find(base, "evt-payout").AmountCents {
+		t.Error("changing the commission did not change the payout")
+	}
+}
+
+// A figure the owner supplied is theirs, and the badge must say so rather than
+// continuing to call it a demo assumption.
+func TestOverriddenFiguresChangeProvenance(t *testing.T) {
+	b := testBuilder(t)
+	fee := 8.0
+	ws := b.Build(contracts.ScenarioRequest{
+		Assumptions: &contracts.AssumptionOverrides{MarketplaceFeePct: &fee},
+	})
+
+	byID := map[string]contracts.Assumption{}
+	for _, a := range ws.Assumptions {
+		byID[a.ID] = a
+	}
+	if got := byID["asm-fee"].Provenance; got != contracts.ProvUserEntered {
+		t.Errorf("an edited commission should be user_entered, got %q", got)
+	}
+	// Untouched figures must NOT be relabelled as the owner's.
+	if got := byID["asm-ads"].Provenance; got != contracts.ProvDemoAssumption {
+		t.Errorf("an untouched figure must stay a demo assumption, got %q", got)
+	}
+	if got := byID["asm-timeshift"].Provenance; got != contracts.ProvDemoAssumption {
+		t.Errorf("the time shift is never the owner's, got %q", got)
+	}
+}
+
+// Removing every outflow must not break the projection.
+func TestRemovingEveryModelledPaymentStillProjects(t *testing.T) {
+	b := testBuilder(t)
+	ws := b.Build(contracts.ScenarioRequest{
+		Assumptions: &contracts.AssumptionOverrides{
+			Outflows: map[string]contracts.OutflowOverride{
+				"asm-supplier": {Removed: true},
+				"asm-ads":      {Removed: true},
+				"asm-rent":     {Removed: true},
+			},
+		},
+	})
+	if len(ws.Scenario.Days) == 0 {
+		t.Fatal("projection produced no days")
+	}
+	if ws.Scenario.BreachesReserve {
+		t.Error("with no outflows at all the reserve cannot be breached")
+	}
+}

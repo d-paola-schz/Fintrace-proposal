@@ -164,33 +164,54 @@ func (b *Builder) Assumptions(res contracts.ScenarioResult) []contracts.Assumpti
 	if res.ReserveCents > 0 {
 		reserve = res.ReserveCents
 	}
+	fx, fxProv := b.fxRate()
+	fee, feeProv := b.feePct()
+	bal, balProv := b.balanceCents()
+
 	out := []contracts.Assumption{
 		{ID: "asm-fx", Label: a.FX.Label, Detail: a.FX.Detail,
-			Value:      fmt.Sprintf("R$%.2f = US$1.00", a.FX.BRLPerUSD),
-			Provenance: contracts.ProvDemoAssumption},
+			Value:      fmt.Sprintf("R$%.2f = US$1.00", fx),
+			Provenance: fxProv, Editable: true, Field: "brlPerUsd"},
 		{ID: "asm-timeshift", Label: a.TimeShift.Label, Detail: a.TimeShift.Detail,
 			Value:      fmt.Sprintf("%s recorded, shown as today", b.Store.Olist.Window.End),
 			Provenance: contracts.ProvDemoAssumption},
 		{ID: "asm-baseline", Label: a.Baseline.Label, Detail: a.Baseline.Detail,
-			Value:      finance.FormatUSD(b.Nessie.BalanceCents) + " — " + b.baselineSource(),
-			Provenance: provenanceOfBaseline(b.Nessie)},
+			Value:      finance.FormatUSD(bal) + " — " + b.baselineSource(),
+			Provenance: balProv, Editable: true, Field: "openingBalanceCents"},
 		{ID: "asm-reserve", Label: a.Reserve.Label, Detail: a.Reserve.Detail,
 			Value: finance.FormatUSD(reserve), Provenance: contracts.ProvUserEntered,
 			Editable: true, Field: "reserveCents"},
 		{ID: "asm-fee", Label: a.MarketplaceFee.Label, Detail: a.MarketplaceFee.Detail,
-			Value:      fmt.Sprintf("%.0f%% of recorded item sales", a.MarketplaceFee.RatePct),
-			Provenance: contracts.ProvDemoAssumption},
+			Value:      fmt.Sprintf("%.0f%% of recorded item sales", fee),
+			Provenance: feeProv, Editable: true, Field: "marketplaceFeePct"},
 		{ID: "asm-payout", Label: a.Payout.Label, Detail: a.Payout.Detail,
 			Value: fmt.Sprintf("%s on %s (delay %+d days)",
 				finance.FormatUSD(b.PayoutAmountCents()),
 				b.offset(a.Payout.OffsetDays+res.PayoutDelayDays), res.PayoutDelayDays),
-			Provenance: contracts.ProvDemoAssumption, Editable: true, Field: "payoutDelayDays"},
+			Provenance: map[bool]string{true: contracts.ProvUserEntered, false: contracts.ProvDemoAssumption}[feeProv == contracts.ProvUserEntered],
+			Editable:   true, Field: "payoutDelayDays"},
 	}
 	for _, o := range a.ScheduledOutflows {
+		ov, edited := b.outflowOverride(o.ID)
+		amount, date := o.AmountCents, b.offset(o.OffsetDays)
+		prov := contracts.ProvDemoAssumption
+		if ov.AmountCents != nil {
+			amount = *ov.AmountCents
+		}
+		if ov.Date != nil {
+			date = *ov.Date
+		}
+		if edited && (ov.AmountCents != nil || ov.Date != nil) {
+			prov = contracts.ProvUserEntered
+		}
+		value := finance.FormatUSD(amount) + " on " + date
+		if ov.Removed {
+			value = "Removed — you said this does not apply"
+			prov = contracts.ProvUserEntered
+		}
 		out = append(out, contracts.Assumption{
 			ID: o.ID, Label: o.Label, Detail: o.Detail,
-			Value:      finance.FormatUSD(o.AmountCents) + " on " + b.offset(o.OffsetDays),
-			Provenance: contracts.ProvDemoAssumption,
+			Value: value, Provenance: prov, Editable: true, Field: "outflow",
 		})
 	}
 	return out

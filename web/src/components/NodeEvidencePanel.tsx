@@ -8,6 +8,7 @@ import { Chat } from './Chat'
 import { ProvenanceChip, TONE_STYLE, ToneMark } from './Tone'
 import { Section } from './Section'
 import { Discoveries } from './Discoveries'
+import { AssumptionEditor, assumptionSummary } from './AssumptionEditor'
 
 /** The contextual panel. Selection, title, chart, evidence and chat always
  *  describe the same node — never two different things at once. */
@@ -342,6 +343,11 @@ function OverviewPanel({
             </li>
           ))}
         </ul>
+      </Section>
+
+      <Section title="Your figures" collapsible defaultOpen={false}>
+        <p className="mb-1.5 text-[10.5px] text-muted">{assumptionSummary(ws)}</p>
+        <AssumptionEditor ws={ws} scenario={scenario} onChange={onApplyScenario} />
       </Section>
 
       <Section title="The business" collapsible defaultOpen={false}>

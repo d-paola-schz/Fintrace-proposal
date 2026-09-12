@@ -28,6 +28,44 @@ type Builder struct {
 	Store  *data.Store
 	Nessie *data.NessieSnapshot
 	Today  time.Time
+	// Overrides are the owner's own figures, replacing the demo's constants.
+	Overrides *contracts.AssumptionOverrides
+}
+
+// --- owner-supplied figures -------------------------------------------------
+//
+// Each accessor returns the owner's value when they have given one, otherwise
+// the modelled default, together with the provenance the resulting figure
+// should carry. A number the owner typed is theirs, and the badge says so.
+
+func (b *Builder) feePct() (float64, string) {
+	if b.Overrides != nil && b.Overrides.MarketplaceFeePct != nil {
+		return *b.Overrides.MarketplaceFeePct, contracts.ProvUserEntered
+	}
+	return b.Store.Assume.MarketplaceFee.RatePct, contracts.ProvDemoAssumption
+}
+
+func (b *Builder) fxRate() (float64, string) {
+	if b.Overrides != nil && b.Overrides.BRLPerUSD != nil {
+		return *b.Overrides.BRLPerUSD, contracts.ProvUserEntered
+	}
+	return b.Store.Assume.FX.BRLPerUSD, contracts.ProvDemoAssumption
+}
+
+func (b *Builder) balanceCents() (int64, string) {
+	if b.Overrides != nil && b.Overrides.OpeningBalanceCents != nil {
+		return *b.Overrides.OpeningBalanceCents, contracts.ProvUserEntered
+	}
+	return b.Nessie.BalanceCents, provenanceOfBaseline(b.Nessie)
+}
+
+// outflowOverride returns the owner's replacement for one modelled payment.
+func (b *Builder) outflowOverride(id string) (contracts.OutflowOverride, bool) {
+	if b.Overrides == nil {
+		return contracts.OutflowOverride{}, false
+	}
+	o, ok := b.Overrides.Outflows[id]
+	return o, ok
 }
 
 // shiftDays is how far the recorded Olist window is moved to reach today.
@@ -51,12 +89,20 @@ func (b *Builder) offset(days int) string {
 	return finance.Day(b.Today).AddDate(0, 0, days).Format(finance.DateLayout)
 }
 
-func (b *Builder) usd(brlCents int64) int64 { return b.Store.BRLToUSDCents(brlCents) }
+func (b *Builder) usd(brlCents int64) int64 {
+	rate, _ := b.fxRate()
+	return int64(float64(brlCents)/rate + 0.5)
+}
 
 // convertedNote renders the disclosure that must accompany every converted figure.
 func (b *Builder) convertedNote(brlCents int64) string {
-	return fmt.Sprintf("Recorded as %s. Shown as %s using the demo rate of R$%.2f = US$1.00, which is not a market rate for any date.",
-		finance.FormatBRL(brlCents), finance.FormatUSD(b.usd(brlCents)), b.Store.Assume.FX.BRLPerUSD)
+	rate, prov := b.fxRate()
+	source := "the demo rate"
+	if prov == contracts.ProvUserEntered {
+		source = "the rate you entered"
+	}
+	return fmt.Sprintf("Recorded as %s. Shown as %s using %s of R$%.2f = US$1.00, which is not a market rate for any date.",
+		finance.FormatBRL(brlCents), finance.FormatUSD(b.usd(brlCents)), source, rate)
 }
 
 // Events returns every timeline event: recorded seller sales redrawn onto the
@@ -181,11 +227,11 @@ func (b *Builder) bankEvents() []contracts.FinancialEvent {
 }
 
 func (b *Builder) balanceMarker() contracts.FinancialEvent {
-	bal := b.Nessie.BalanceCents
-	prov := contracts.ProvNessieSandbox
+	bal, prov := b.balanceCents()
 	note := "Read from the Nessie sandbox account."
-	if b.Nessie.Source != "live" {
-		prov = contracts.ProvDemoAssumption
+	if prov == contracts.ProvUserEntered {
+		note = "You entered this opening balance, replacing the figure the app would otherwise use."
+	} else if b.Nessie.Source != "live" {
 		note = b.Nessie.Detail
 	}
 	return contracts.FinancialEvent{
@@ -209,7 +255,8 @@ func (b *Builder) balanceMarker() contracts.FinancialEvent {
 // the demo rate. Every step of that is an assumption except the revenue.
 func (b *Builder) PayoutAmountCents() int64 {
 	brl := b.Store.Olist.Window.ItemRevenueCents
-	net := int64(float64(brl) * (100 - b.Store.Assume.MarketplaceFee.RatePct) / 100)
+	fee, _ := b.feePct()
+	net := int64(float64(brl) * (100 - fee) / 100)
 	return b.usd(net)
 }
 
@@ -218,6 +265,22 @@ func (b *Builder) futureEvents() []contracts.FinancialEvent {
 	a := b.Store.Assume
 
 	for _, o := range a.ScheduledOutflows {
+		ov, edited := b.outflowOverride(o.ID)
+		if ov.Removed {
+			continue
+		}
+		amount, date := o.AmountCents, b.offset(o.OffsetDays)
+		prov, detail := contracts.ProvDemoAssumption, o.Detail
+		if ov.AmountCents != nil {
+			amount = *ov.AmountCents
+		}
+		if ov.Date != nil {
+			date = *ov.Date
+		}
+		if edited && (ov.AmountCents != nil || ov.Date != nil) {
+			prov = contracts.ProvUserEntered
+			detail = "You entered this payment, replacing the figure the demo would otherwise assume."
+		}
 		kind := "bill"
 		switch o.ID {
 		case "asm-supplier":
@@ -226,37 +289,42 @@ func (b *Builder) futureEvents() []contracts.FinancialEvent {
 			kind = "ad_spend"
 		}
 		out = append(out, contracts.FinancialEvent{
-			ID: "evt-" + o.ID, Date: b.offset(o.OffsetDays), Label: o.Label, Kind: kind,
-			AmountCents: o.AmountCents, Currency: o.Currency,
-			Provenance: contracts.ProvDemoAssumption, Certainty: contracts.CertaintyScheduled,
+			ID: "evt-" + o.ID, Date: date, Label: o.Label, Kind: kind,
+			AmountCents: amount, Currency: o.Currency,
+			Provenance: prov, Certainty: contracts.CertaintyScheduled,
 			SourceRefs: []string{o.ID}, AsOf: b.offset(0), AffectsCash: true,
-			Detail: o.Detail,
+			Detail: detail,
 			Claims: []contracts.Claim{{
 				ID: "claim-" + o.ID, Label: o.Label,
-				Display: finance.FormatUSD(o.AmountCents), AmountCents: ptr(o.AmountCents),
-				Currency: "USD", Provenance: contracts.ProvDemoAssumption,
-				SourceRefs: []string{o.ID}, Note: o.Detail,
+				Display: finance.FormatUSD(amount), AmountCents: ptr(amount),
+				Currency: "USD", Provenance: prov,
+				SourceRefs: []string{o.ID}, Note: detail,
 			}},
 		})
 	}
 
 	brl := b.Store.Olist.Window.ItemRevenueCents
 	payout := b.PayoutAmountCents()
+	fee, feeProv := b.feePct()
+	payoutProv := contracts.ProvDemoAssumption
+	if feeProv == contracts.ProvUserEntered {
+		payoutProv = contracts.ProvUserEntered
+	}
 	out = append(out, contracts.FinancialEvent{
 		ID: "evt-payout", Date: b.offset(a.Payout.OffsetDays), Label: a.Payout.Label,
 		Kind: finance.PayoutEventKind, AmountCents: payout, Currency: "USD",
-		Provenance: contracts.ProvDemoAssumption, Certainty: contracts.CertaintyConditional,
+		Provenance: payoutProv, Certainty: contracts.CertaintyConditional,
 		SourceRefs: []string{"asm-payout", "asm-fee", "src-olist-window", "src-fx"},
 		AsOf:       b.offset(0), AffectsCash: true,
 		Detail: a.Payout.Detail,
 		Claims: []contracts.Claim{{
 			ID: "claim-payout", Label: "Expected payout",
 			Display: finance.FormatUSD(payout), AmountCents: ptr(payout), Currency: "USD",
-			Provenance: contracts.ProvDemoAssumption,
+			Provenance: payoutProv,
 			SourceRefs: []string{"src-olist-window", "asm-fee", "src-fx"},
 			Note: fmt.Sprintf(
-				"Built from %s of recorded item sales in the 30-day window, less a modeled %.0f%% marketplace commission, converted at the demo rate. Olist publishes no payout ledger, so both the date and the commission are assumptions.",
-				finance.FormatBRL(brl), b.Store.Assume.MarketplaceFee.RatePct),
+				"Built from %s of recorded item sales in the 30-day window, less a %.0f%% marketplace commission, converted to dollars. Olist publishes no payout ledger, so the date and the commission do not come from the records.",
+				finance.FormatBRL(brl), fee),
 		}},
 	})
 	return out
