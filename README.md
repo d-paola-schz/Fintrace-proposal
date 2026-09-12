@@ -22,8 +22,8 @@ mismatched selected-node state are **not** treated as facts — see
 Requires Go 1.26+ and Node 22+.
 
 ```bash
-git clone https://github.com/d-paola-schz/Capital-One-Challenge.git
-cd Capital-One-Challenge
+git clone https://github.com/d-paola-schz/Fintrace-proposal.git
+cd Fintrace-proposal
 npm --prefix web install
 npm --prefix web run build
 go build -o preflight-bin ./server/cmd/preflight
@@ -54,7 +54,8 @@ Copy `.env.example` and fill in what you have.
 | `NESSIE_ACCOUNT_ID` | no | The sandbox account with the largest balance is used. |
 | `NESSIE_BASE_URL` | no | Defaults to `https://api.nessieisreal.com`. |
 | `GEMINI_API_KEY` | no | Header shows `AI UNAVAILABLE`; the engine writes chat answers itself and says so. Nothing is faked. |
-| `GEMINI_MODEL` | no | Defaults to `gemini-2.0-flash`. Confirm free-tier eligibility before deploying. |
+| `GEMINI_MODEL` | no | Defaults to `gemini-3.6-flash`. Confirm free-tier eligibility before deploying — Google discontinues model names over time; if `/api/probe` reports a 404, the response names the models your key can actually use. |
+| `GEMINI_BASE_URL` | no | Defaults to `https://generativelanguage.googleapis.com`. Only for testing against a stub. |
 | `AI_PROVIDER` | no | `gemini` when a key is present, otherwise none. Set `ollama` for a local model. |
 | `OLLAMA_BASE_URL` | no | Defaults to `http://127.0.0.1:11434`. Never expose it publicly. |
 | `PORT` | no | Defaults to `8080`. |
@@ -80,6 +81,15 @@ opening balance and future cash events do. Both rules are enforced by tests.
 **What the sources cannot support is never shown.** Olist publishes no cost of
 goods, no inventory and no payout ledger, so Preflight shows no margin and no
 days-of-stock figure. It names the one missing number instead.
+
+**Why aren't they joined?** Because they are not the same business — Olist is a
+real historical seller, Nessie is an unrelated sandbox customer, and inventing
+a link between them would be a claim the data cannot back. Both sources are
+real (a genuine dataset, a genuine live API call); only their combination is
+staged for the demo. In a real deployment, Olist and Nessie both disappear,
+replaced by one onboarded business's own bank connection and own sales
+channel — see [§6 of `docs/DATA_PROVENANCE.md`](docs/DATA_PROVENANCE.md#6-today-vs-a-real-deployment-why-the-two-sources-are-not-joined)
+for what that migration looks like.
 
 Full detail, including the SHA-256 of every source file and the seller
 substitution, is in [`docs/DATA_PROVENANCE.md`](docs/DATA_PROVENANCE.md).
@@ -109,7 +119,7 @@ deliberately departs from it:
 ## Tests
 
 ```bash
-go test ./server/...                               # 43 tests
+go test ./server/...                               # 60 tests
 python3 -m venv .venv && .venv/bin/pip install duckdb
 .venv/bin/python scripts/verify_attribution.py     # data attribution checks
 ```
@@ -174,7 +184,7 @@ One Render Free web service built from the included `Dockerfile`
 (see `render.yaml`). Health check: `/api/health`.
 
 1. Render → **New → Web Service** → connect this repo.
-2. Branch: `integration/preflight-app`. Runtime **Docker**, plan **Free**.
+2. Branch: `main` (or `integration/preflight-v2` if deploying before it merges). Runtime **Docker**, plan **Free**.
    `render.yaml` already declares this if you use a Blueprint instead.
 3. Add the keys under **Environment** in the Render dashboard — never in the
    repository, never in chat: `NESSIE_API_KEY`, `NESSIE_ACCOUNT_ID`,
