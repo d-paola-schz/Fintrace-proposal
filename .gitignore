@@ -1,0 +1,10 @@
+# Raw dataset (large, redistributable only under Olist CC BY-NC-SA; keep local)
+data/raw/
+node_modules/
+web/dist/
+server/webdist/
+preflight-bin
+.env
+.env.*
+!.env.example
+.DS_Store
