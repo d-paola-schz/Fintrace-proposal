@@ -39,7 +39,8 @@ func heuristicIntent(q, nodeID string) ai.Intent {
 		return ai.IntentEvidence
 	case containsAny(l, "why is cash", "cash tight", "cash gap", "shortfall",
 		"run out", "below my reserve", "breach", "what if the payout", "payout late",
-		"payout is delayed", "delay"):
+		"payout is delayed", "delay", "days late", "is late", "arrives late",
+		"lands late", "comes late"):
 		return ai.IntentExplainCash
 	case containsAny(l, "lowest", "projection", "alternative", "compare", "instead",
 		"scenario", "what happens if"):
