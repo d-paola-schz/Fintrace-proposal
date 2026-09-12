@@ -98,3 +98,65 @@ scenario still works; only the phrasing changes, and the header says
 The model may also extract a proposed amount and date from a question. It is
 never allowed to guess one: a missing amount or date produces a visible request
 for it, and the extracted proposal is always shown for editing before it runs.
+
+## 6. Today vs. a real deployment: why the two sources are not joined
+
+**There is no relationship between Olist and Nessie beyond the opening
+balance.** This is worth stating plainly, for the team as much as for anyone
+reviewing the code: they do not share an entity, a time period, or a currency.
+
+| | Olist | Nessie |
+| --- | --- | --- |
+| Entity | A real seller from the Olist marketplace (`955fee92…`) | An unrelated, fictional sandbox customer |
+| Time period | Real sales from 2017-07-24 to 2018-08-28, **time-shifted** onto today's calendar | A balance read "now" |
+| Currency | BRL, converted at an invented flat rate (R$5.00 = US$1.00) | USD, as returned by the API |
+
+The only interaction between the two is that Nessie's balance is used as the
+**starting number** for a projection whose day-to-day movements come entirely
+from Olist and from `data/demo-assumptions.json`. That is a staging decision
+for the demo, not a data relationship — see `Build()` and `RunScenario()` in
+`server/internal/workspace/build.go`.
+
+**Both sources are still real, and that is deliberate.** Olist is genuine
+historical marketplace data, not synthetic. Nessie is a genuine live API call
+against Capital One's sandbox, not a mock we wrote ourselves. Using two real
+sources proves the plumbing works end to end — normalizing a real CSV dataset,
+calling a real bank API, projecting a real balance forward — without
+pretending they describe the same business, which they do not.
+
+**Joining them today would be dishonest, not just unfinished.** Olist is a
+public historical dataset; no live customer stands behind it. Fabricating a
+link between a real bank balance and a stranger's 2018 sales would produce a
+number that looks precise and means nothing.
+
+### What changes in a real product
+
+The seed of the idea does not change — a business's cash balance plus its
+future sales, checked against a reserve — but Olist would not be part of it.
+In production, both feeds would belong to the **same onboarded business**:
+
+1. A `business`/`customer` record created at signup, in a database this
+   product owns (this is the piece that does not exist yet).
+2. A real bank connection scoped to that business (open banking / Plaid-style,
+   or Nessie's production tier if Capital One offers one) — replacing the
+   Nessie sandbox call, not extending it.
+3. A real sales-channel connection scoped to that same business (Shopify,
+   WooCommerce, Mercado Libre, or whatever platform they actually sell on) —
+   replacing Olist entirely, not joining it to anything.
+
+Only at that point does a join make sense, because both sides would describe
+the same business in the same window in the same currency. Until that
+integration exists, presenting Olist+Nessie as anything other than a
+proof-of-plumbing for the demo would be a claim the product cannot support —
+which is exactly the standard the rest of this document holds itself to.
+
+### Known limitation of the current demo
+
+The running demo reads from **one Nessie sandbox account**, created once and
+referenced by `NESSIE_ACCOUNT_ID`. That is a demo simplification, not a
+product design: it stands in for the single onboarded business the current
+prototype serves. A multi-business deployment would need one bank connection
+per onboarded customer, created at signup rather than by hand — which in turn
+needs the `business`/`customer` record described above. No credentials,
+account ids, or customer ids belonging to this or any sandbox account are
+recorded in this repository.
