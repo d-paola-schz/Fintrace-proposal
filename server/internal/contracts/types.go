@@ -12,6 +12,15 @@ const (
 	ProvDemoAssumption  = "demo_assumption"
 )
 
+// ProvenanceWords renders a provenance for prose rather than for a badge.
+var ProvenanceWords = map[string]string{
+	ProvOlistHistorical: "the Olist records",
+	ProvNessieSandbox:   "the sandbox bank account",
+	ProvDerived:         "a calculation on this page",
+	ProvUserEntered:     "something you entered",
+	ProvDemoAssumption:  "a demo assumption",
+}
+
 // Certainty values.
 const (
 	CertaintyRecorded    = "recorded"
