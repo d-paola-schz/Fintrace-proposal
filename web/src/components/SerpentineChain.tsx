@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { Chain, ChainNode, Tone } from '../types/contracts'
 import { TONE_STYLE, ToneMark } from './Tone'
 import { STATUS_LABEL } from '../lib/format'
@@ -128,32 +128,129 @@ export function layoutChain(
   }
 }
 
-/** The strand itself. Two passes: a solid tone line, then white gaps that read
- *  as links without turning the chain into jewellery. */
+/**
+ * The strand, drawn as an actual chain.
+ *
+ * Links are placed along the measured path at a fixed spacing and rotated to
+ * the local tangent, so they follow the switchback round its turns. Consecutive
+ * links alternate between face-on and edge-on and are spaced closer together
+ * than they are long, which is what makes them read as interlocking rather than
+ * as beads on a string.
+ */
+
+/** Geometry of one link, in path-space pixels. */
+const LINK_LEN = 19
+const LINK_FACE_W = 13
+const LINK_EDGE_W = 6
+const LINK_SPACING = 12.5 // < LINK_LEN, so neighbours overlap and interlock
+const LINK_STROKE = 3
+
+interface Link {
+  x: number
+  y: number
+  /** tangent angle in degrees */
+  a: number
+  face: boolean
+}
+
+/** Measures a path and returns evenly spaced, tangent-aligned link positions. */
+function useLinksAlongPath(d: string): [React.RefObject<SVGPathElement | null>, Link[]] {
+  const ref = useRef<SVGPathElement | null>(null)
+  const [links, setLinks] = useState<Link[]>([])
+
+  useLayoutEffect(() => {
+    const path = ref.current
+    if (!path) return
+    let total = 0
+    try {
+      total = path.getTotalLength()
+    } catch {
+      return
+    }
+    if (!Number.isFinite(total) || total <= 0) {
+      setLinks([])
+      return
+    }
+    const out: Link[] = []
+    let i = 0
+    for (let at = LINK_SPACING / 2; at <= total; at += LINK_SPACING, i++) {
+      const p = path.getPointAtLength(at)
+      // Sample slightly ahead for the tangent; clamp at the end of the path.
+      const ahead = path.getPointAtLength(Math.min(total, at + 1))
+      const behind = path.getPointAtLength(Math.max(0, at - 1))
+      const a = (Math.atan2(ahead.y - behind.y, ahead.x - behind.x) * 180) / Math.PI
+      out.push({ x: p.x, y: p.y, a, face: i % 2 === 0 })
+    }
+    setLinks(out)
+  }, [d])
+
+  return [ref, links]
+}
+
+function ChainSegmentLinks({ d, tone }: { d: string; tone: Tone }) {
+  const [ref, links] = useLinksAlongPath(d)
+  const colour = TONE_STYLE[tone].stroke
+
+  return (
+    <g>
+      {/* Measured, never painted: the links are the visible strand. */}
+      <path ref={ref} d={d} fill="none" stroke="none" />
+      {links.map((l, i) => {
+        const w = l.face ? LINK_FACE_W : LINK_EDGE_W
+        return (
+          <g key={i} transform={`translate(${l.x} ${l.y}) rotate(${l.a})`}>
+            {/* seat the link against its neighbours */}
+            <rect
+              x={-LINK_LEN / 2}
+              y={-w / 2}
+              width={LINK_LEN}
+              height={w}
+              rx={w / 2}
+              ry={w / 2}
+              fill="none"
+              stroke="var(--color-paper)"
+              strokeWidth={LINK_STROKE + 2.2}
+            />
+            <rect
+              x={-LINK_LEN / 2}
+              y={-w / 2}
+              width={LINK_LEN}
+              height={w}
+              rx={w / 2}
+              ry={w / 2}
+              fill="none"
+              stroke={colour}
+              strokeWidth={LINK_STROKE}
+              opacity={l.face ? 0.95 : 0.8}
+            />
+            {/* a single highlight along the top of the face-on links reads as
+                a machined edge catching the light */}
+            {l.face && (
+              <rect
+                x={-LINK_LEN / 2 + 2.4}
+                y={-w / 2 + 1.1}
+                width={LINK_LEN - 4.8}
+                height={w - 2.2}
+                rx={(w - 2.2) / 2}
+                ry={(w - 2.2) / 2}
+                fill="none"
+                stroke="#ffffff"
+                strokeWidth={0.9}
+                opacity={0.5}
+              />
+            )}
+          </g>
+        )
+      })}
+    </g>
+  )
+}
+
 export function ChainStrand({ layout }: { layout: ChainLayout }) {
   return (
     <g aria-hidden>
       {layout.segments.map((s) => (
-        <g key={s.key}>
-          <path
-            d={s.d}
-            fill="none"
-            stroke={TONE_STYLE[s.tone].stroke}
-            strokeWidth={3}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            opacity={0.92}
-          />
-          <path
-            d={s.d}
-            fill="none"
-            stroke="var(--color-paper)"
-            strokeWidth={3.4}
-            strokeLinecap="butt"
-            strokeDasharray="1.1 8"
-            opacity={0.75}
-          />
-        </g>
+        <ChainSegmentLinks key={s.key} d={s.d} tone={s.tone} />
       ))}
     </g>
   )
