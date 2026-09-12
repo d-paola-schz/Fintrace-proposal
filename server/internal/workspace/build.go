@@ -25,7 +25,7 @@ func (b *Builder) Build(req contracts.ScenarioRequest) contracts.WorkspaceRespon
 	}
 
 	chains := b.BuildChains(res, displayEvents)
-	start, end := b.WindowBounds()
+	start, end := b.WindowBounds(displayEvents)
 
 	return contracts.WorkspaceResponse{
 		Business:        b.profile(),

@@ -38,9 +38,9 @@ export function ClaimRow({ claim }: { claim: Claim }) {
           {claim.asOf && (
             <p className="mt-1.5 text-[10px] text-muted">As of {longDate(claim.asOf)}</p>
           )}
-          {claim.sourceRefs.length > 0 ? (
+          {(claim.sourceRefs ?? []).length > 0 ? (
             <div className="mt-2 flex flex-wrap gap-1.5">
-              {claim.sourceRefs.map((ref) => (
+              {(claim.sourceRefs ?? []).map((ref) => (
                 <SourceLink key={ref} id={ref} />
               ))}
             </div>

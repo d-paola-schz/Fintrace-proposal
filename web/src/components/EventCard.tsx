@@ -3,6 +3,8 @@ import { CERTAINTY_LABEL, shortDate, usd } from '../lib/format'
 
 export const CARD_W = 172
 export const CARD_H = 50
+/** Card height when vertical room is tight. */
+export const CARD_H_COMPACT = 42
 
 const KIND_ACCENT: Record<string, string> = {
   sales: '#2563eb',
@@ -20,6 +22,7 @@ export function EventCard({
   event,
   x,
   y,
+  h = CARD_H,
   hasChain,
   highlighted,
   selected,
@@ -28,6 +31,7 @@ export function EventCard({
   event: FinancialEvent
   x: number
   y: number
+  h?: number
   hasChain: boolean
   highlighted: boolean
   selected: boolean
@@ -53,7 +57,7 @@ export function EventCard({
         left: x - CARD_W / 2,
         top: y,
         width: CARD_W,
-        height: CARD_H,
+        height: h,
         borderLeft: `3px solid ${accent}`,
         borderStyle: projected ? 'dashed solid solid dashed' : undefined,
         borderLeftStyle: 'solid',

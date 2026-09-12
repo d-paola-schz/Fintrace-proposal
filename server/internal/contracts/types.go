@@ -349,3 +349,93 @@ type HealthResponse struct {
 	Sources     []SourceStatus `json:"sources"`
 	DataVersion string         `json:"dataVersion"`
 }
+
+// --- JSON slice discipline ----------------------------------------------
+//
+// Go marshals a nil slice as `null`, not `[]`. The client reads these fields
+// with `.length`, so a single nil slice anywhere in this payload takes down the
+// whole React tree. Every response is passed through Sanitize before it is
+// written, so the contract can promise: a field typed as an array is always an
+// array.
+
+func nonNil[T any](s []T) []T {
+	if s == nil {
+		return []T{}
+	}
+	return s
+}
+
+func sanitizeClaims(cs []Claim) []Claim {
+	cs = nonNil(cs)
+	for i := range cs {
+		cs[i].SourceRefs = nonNil(cs[i].SourceRefs)
+	}
+	return cs
+}
+
+func sanitizeChart(c *ChartSpec) *ChartSpec {
+	if c == nil {
+		return nil
+	}
+	c.Points = nonNil(c.Points)
+	c.SourceRefs = nonNil(c.SourceRefs)
+	return c
+}
+
+func sanitizeEvents(es []FinancialEvent) []FinancialEvent {
+	es = nonNil(es)
+	for i := range es {
+		es[i].SourceRefs = nonNil(es[i].SourceRefs)
+		es[i].Claims = sanitizeClaims(es[i].Claims)
+	}
+	return es
+}
+
+// Sanitize fills every nil slice in the result so the client never sees null
+// where it expects an array.
+func (r *ScenarioResult) Sanitize() {
+	r.Days = nonNil(r.Days)
+	for i := range r.Days {
+		r.Days[i].EventIDs = nonNil(r.Days[i].EventIDs)
+	}
+	r.AppliedEvents = sanitizeEvents(r.AppliedEvents)
+	r.Assumptions = nonNil(r.Assumptions)
+	r.MissingInputs = nonNil(r.MissingInputs)
+	r.Claims = sanitizeClaims(r.Claims)
+	r.Alternatives = nonNil(r.Alternatives)
+	r.Caveats = nonNil(r.Caveats)
+}
+
+// Sanitize fills every nil slice in the workspace payload.
+func (w *WorkspaceResponse) Sanitize() {
+	w.Events = sanitizeEvents(w.Events)
+	w.Assumptions = nonNil(w.Assumptions)
+	w.Sources = nonNil(w.Sources)
+	w.SourceStatus = nonNil(w.SourceStatus)
+	w.Chains = nonNil(w.Chains)
+	for i := range w.Chains {
+		c := &w.Chains[i]
+		c.Segments = nonNil(c.Segments)
+		c.Nodes = nonNil(c.Nodes)
+		for j := range c.Nodes {
+			n := &c.Nodes[j]
+			n.Claims = sanitizeClaims(n.Claims)
+			n.SourceRefs = nonNil(n.SourceRefs)
+			n.AssumptionRefs = nonNil(n.AssumptionRefs)
+			n.ResponseOptions = nonNil(n.ResponseOptions)
+			n.SuggestedAsks = nonNil(n.SuggestedAsks)
+			n.Chart = sanitizeChart(n.Chart)
+		}
+	}
+	if w.Alert != nil {
+		w.Alert.EventIDs = nonNil(w.Alert.EventIDs)
+	}
+	w.Scenario.Sanitize()
+}
+
+// Sanitize fills every nil slice in a chat reply.
+func (c *ChatResponse) Sanitize() {
+	c.SourceRefs = nonNil(c.SourceRefs)
+	c.Claims = sanitizeClaims(c.Claims)
+	c.MissingInputs = nonNil(c.MissingInputs)
+}

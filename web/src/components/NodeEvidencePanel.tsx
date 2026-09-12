@@ -95,7 +95,9 @@ function NodePanel({
 }) {
   const chain = ws.chains.find((c) => c.id === node.chainId)
   const t = TONE_STYLE[node.tone]
-  const assumptions = ws.assumptions.filter((a) => node.assumptionRefs.includes(a.id))
+  const assumptions = (ws.assumptions ?? []).filter((a) =>
+    (node.assumptionRefs ?? []).includes(a.id),
+  )
 
   return (
     <PanelShell
@@ -113,7 +115,7 @@ function NodePanel({
           </span>
           {chain && (
             <span className="tnum text-[10.5px] text-muted">
-              {chain.title} · {node.sequence} of {chain.nodes.length}
+              {chain.title} · {node.sequence} of {(chain.nodes ?? []).length}
             </span>
           )}
         </div>
@@ -123,7 +125,7 @@ function NodePanel({
       {/* step through the chain without losing your place */}
       {chain && (
         <div className="mb-3 flex gap-1">
-          {chain.nodes.map((n) => (
+          {(chain.nodes ?? []).map((n) => (
             <button
               key={n.id}
               type="button"
@@ -153,11 +155,11 @@ function NodePanel({
         </div>
       )}
 
-      {node.claims.length > 0 && (
+      {(node.claims ?? []).length > 0 && (
         <section className="mt-4">
           <SectionTitle>Evidence</SectionTitle>
           <ul className="rounded-lg border border-hair bg-white px-3">
-            {node.claims.map((c) => (
+            {(node.claims ?? []).map((c) => (
               <ClaimRow key={c.id} claim={c} />
             ))}
           </ul>
@@ -187,11 +189,11 @@ function NodePanel({
         </section>
       )}
 
-      {node.responseOptions.length > 0 && (
+      {(node.responseOptions ?? []).length > 0 && (
         <section className="mt-4">
           <SectionTitle>What you could do</SectionTitle>
           <ul className="space-y-1.5">
-            {node.responseOptions.map((o) => (
+            {(node.responseOptions ?? []).map((o) => (
               <li key={o.id} className="rounded-lg border border-hair bg-white p-2.5">
                 <p className="text-[12px] font-semibold text-ink">{o.label}</p>
                 <p className="mt-0.5 text-[10.5px] leading-snug text-muted">{o.detail}</p>
@@ -230,9 +232,9 @@ function NodePanel({
 
       <p className="mt-3 text-[10px] text-muted">
         Rule <span className="font-mono">{node.ruleId}</span> · sources{' '}
-        {node.sourceRefs.length > 0 ? (
+        {(node.sourceRefs ?? []).length > 0 ? (
           <span className="inline-flex flex-wrap gap-1 align-middle">
-            {node.sourceRefs.slice(0, 4).map((r) => (
+            {(node.sourceRefs ?? []).slice(0, 4).map((r) => (
               <SourceLink key={r} id={r} />
             ))}
           </span>
@@ -275,11 +277,11 @@ function EventPanel({ event, onClose }: { event: FinancialEvent; onClose: () => 
         <p className="mt-3 text-[12.5px] leading-relaxed text-[#22303f]">{event.detail}</p>
       )}
 
-      {event.claims && event.claims.length > 0 && (
+      {(event.claims ?? []).length > 0 && (
         <section className="mt-4">
           <SectionTitle>Evidence</SectionTitle>
           <ul className="rounded-lg border border-hair bg-white px-3">
-            {event.claims.map((c) => (
+            {(event.claims ?? []).map((c) => (
               <ClaimRow key={c.id} claim={c} />
             ))}
           </ul>
@@ -289,7 +291,7 @@ function EventPanel({ event, onClose }: { event: FinancialEvent; onClose: () => 
       <section className="mt-4">
         <SectionTitle>Sources</SectionTitle>
         <div className="flex flex-wrap gap-1.5">
-          {event.sourceRefs.map((r) => (
+          {(event.sourceRefs ?? []).map((r) => (
             <SourceLink key={r} id={r} />
           ))}
         </div>
@@ -323,7 +325,7 @@ function OverviewPanel({
       <section className="mt-3">
         <SectionTitle>The numbers</SectionTitle>
         <ul className="rounded-lg border border-hair bg-white px-3">
-          {s.claims.map((c) => (
+          {(s.claims ?? []).map((c) => (
             <ClaimRow key={c.id} claim={c} />
           ))}
         </ul>
@@ -332,7 +334,7 @@ function OverviewPanel({
       <section className="mt-4">
         <SectionTitle>What this cannot tell you</SectionTitle>
         <ul className="space-y-1.5">
-          {s.missingInputs.map((m) => (
+          {(s.missingInputs ?? []).map((m) => (
             <li key={m.field} className="rounded-lg border border-hair bg-white p-2.5">
               <p className="text-[11.5px] font-semibold text-ink">{m.question}</p>
               <p className="mt-0.5 text-[10.5px] leading-snug text-muted">{m.whyItMatters}</p>

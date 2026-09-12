@@ -168,9 +168,9 @@ function Answer({
         </div>
       )}
 
-      {response.sourceRefs.length > 0 && (
+      {(response.sourceRefs ?? []).length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1.5">
-          {[...new Set(response.sourceRefs)].slice(0, 6).map((r) => (
+          {[...new Set(response.sourceRefs ?? [])].slice(0, 6).map((r) => (
             <SourceLink key={r} id={r} />
           ))}
         </div>

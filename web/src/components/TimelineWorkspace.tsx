@@ -1,9 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { Chain, WorkspaceResponse } from '../types/contracts'
 import { addDays, daysBetween, shortDate, usd } from '../lib/format'
-import { CARD_H, CARD_W, EventCard } from './EventCard'
+import { CARD_H, CARD_H_COMPACT, CARD_W, EventCard } from './EventCard'
 import {
-  ChainNodeCard, ChainStrand, DEFAULT_METRICS, NODE_H, layoutChain,
+  ChainNodeCard, ChainStrand, DEFAULT_METRICS, NODE_H, NODE_H_COMPACT, layoutChain,
   type ChainMetrics,
 } from './SerpentineChain'
 
@@ -69,33 +69,42 @@ export function TimelineWorkspace({
     })
   }, [ws.events, ws.windowStart, ws.windowEnd, x])
 
-  const rowCount = Math.max(1, ...placed.map((p) => p.row + 1))
-  const cardBandH = rowCount * (CARD_H + CARD_ROW_GAP)
+  // Vertical budget. Below roughly 700px of workspace the comfortable sizes no
+  // longer fit two three-level chains around a centred axis, and the lowest
+  // node drops below the fold — which is exactly what happens on a 1366x768
+  // laptop or a 720p projector. Shrink the boxes rather than hide a node.
+  const compact = frameH < 700
+  const nodeH = compact ? NODE_H_COMPACT : NODE_H
+  const cardH = compact ? CARD_H_COMPACT : CARD_H
 
-  // Vertical budget. The axis sits at the centre of the workspace whenever the
-  // chains fit; when they do not, the axis moves just far enough for the upper
-  // chain to be whole and the canvas scrolls rather than clipping a node.
-  const GAP_FLOOR = NODE_H + 8
-  const FIRST_ABOVE = DEFAULT_METRICS.firstLevel
-  const FIRST_BELOW = 54
+  const rowCount = Math.max(1, ...placed.map((p) => p.row + 1))
+  const cardBandH = rowCount * (cardH + CARD_ROW_GAP)
+
+  // The axis sits at the centre of the workspace whenever the chains fit; when
+  // they do not, it moves just far enough for the upper chain to be whole and
+  // the canvas scrolls rather than clipping a node.
+  const GAP_FLOOR = nodeH + 8
+  const FIRST_ABOVE = compact ? 26 : DEFAULT_METRICS.firstLevel
+  const FIRST_BELOW = compact ? 46 : 54
 
   const clampGap = (avail: number, first: number) =>
-    Math.round(Math.min(122, Math.max(GAP_FLOOR, (avail - NODE_H - first) / 2)))
+    Math.round(Math.min(122, Math.max(GAP_FLOOR, (avail - nodeH - first) / 2)))
 
-  const gapAbove = clampGap(frameH / 2 - cardBandH - 48, FIRST_ABOVE)
-  const aboveNeed = cardBandH + 22 + FIRST_ABOVE + 2 * gapAbove + NODE_H / 2 + 26
+  const gapAbove = clampGap(frameH / 2 - cardBandH - (compact ? 38 : 48), FIRST_ABOVE)
+  const aboveNeed =
+    cardBandH + 22 + FIRST_ABOVE + 2 * gapAbove + nodeH / 2 + (compact ? 20 : 26)
   const axisY = Math.max(Math.round(frameH / 2), Math.round(aboveNeed))
-  const gapBelow = clampGap(Math.max(frameH, axisY + 220) - axisY - 46, FIRST_BELOW)
-  const belowNeed = FIRST_BELOW + 2 * gapBelow + NODE_H / 2 + 40
+  const gapBelow = clampGap(Math.max(frameH, axisY + 200) - axisY - 46, FIRST_BELOW)
+  const belowNeed = FIRST_BELOW + 2 * gapBelow + nodeH / 2 + (compact ? 30 : 40)
   const canvasH = Math.max(frameH, Math.round(axisY + belowNeed))
 
   // Row 0 sits nearest the axis; later rows stack further away from it.
-  const cardTop = (row: number) => axisY - 22 - (row + 1) * (CARD_H + CARD_ROW_GAP)
+  const cardTop = (row: number) => axisY - 22 - (row + 1) * (cardH + CARD_ROW_GAP)
 
   const metricsFor = (dir: 1 | -1): ChainMetrics =>
     dir === 1
-      ? { ...DEFAULT_METRICS, firstLevel: FIRST_BELOW, levelGap: gapBelow }
-      : { ...DEFAULT_METRICS, firstLevel: FIRST_ABOVE, levelGap: gapAbove }
+      ? { ...DEFAULT_METRICS, firstLevel: FIRST_BELOW, levelGap: gapBelow, nodeH }
+      : { ...DEFAULT_METRICS, firstLevel: FIRST_ABOVE, levelGap: gapAbove, nodeH }
 
   const chainAnchor = (chain: Chain) => {
     const root = ws.events.find((e) => e.id === chain.rootEventId)
@@ -114,7 +123,7 @@ export function TimelineWorkspace({
         return { chain, layout: layoutChain(chain, anchorX, anchorY, dir, flip, metricsFor(dir)) }
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ws.chains, ws.events, axisY, cardBandH, canvasW, gapAbove, gapBelow],
+    [ws.chains, ws.events, axisY, cardBandH, canvasW, gapAbove, gapBelow, nodeH],
   )
 
   // Open on today, with the future — where the decisions are — in view.
@@ -212,7 +221,7 @@ export function TimelineWorkspace({
               <g key={`stem-${event.id}`}>
                 <line
                   x1={x(event.date)}
-                  y1={cardTop(row) + CARD_H}
+                  y1={cardTop(row) + cardH}
                   x2={x(event.date)}
                   y2={axisY}
                   stroke={highlighted.has(event.id) ? 'var(--color-flow)' : '#c6cedb'}
@@ -250,6 +259,7 @@ export function TimelineWorkspace({
               event={event}
               x={x(event.date)}
               y={cardTop(row)}
+              h={cardH}
               hasChain={chainRoots.has(event.id)}
               highlighted={highlighted.has(event.id)}
               selected={selectedEventId === event.id}
@@ -278,6 +288,7 @@ export function TimelineWorkspace({
                   node={lv.node}
                   x={lv.nodeX}
                   y={lv.y}
+                  h={nodeH}
                   selected={selectedNodeId === lv.node.id}
                   onSelect={onSelectNode}
                 />

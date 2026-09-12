@@ -13,10 +13,14 @@ import (
 	"github.com/preflight/preflight/server/internal/finance"
 )
 
-// Display window around today, in days.
+// Minimum display window around today, in days. The rendered window always
+// grows to contain every event, so a payout pushed to the end of the delay
+// range can never fall off the edge of the timeline.
 const (
 	pastDays   = 21
 	futureDays = 14
+	// edgePadDays keeps an event off the very rim of the canvas.
+	edgePadDays = 2
 )
 
 // Builder assembles a workspace for a given "today".
@@ -258,9 +262,27 @@ func (b *Builder) futureEvents() []contracts.FinancialEvent {
 	return out
 }
 
-// WindowBounds is the visible span of the timeline.
-func (b *Builder) WindowBounds() (string, string) {
-	return b.offset(-pastDays), b.offset(futureDays)
+// WindowBounds is the visible span of the timeline. It starts from the default
+// window around today and then stretches to cover every event it was given, so
+// nothing a scenario produces is ever rendered outside the axis.
+func (b *Builder) WindowBounds(events []contracts.FinancialEvent) (string, string) {
+	start := finance.Day(b.Today).AddDate(0, 0, -pastDays)
+	end := finance.Day(b.Today).AddDate(0, 0, futureDays)
+
+	for _, e := range events {
+		d, err := finance.ParseDate(e.Date)
+		if err != nil {
+			continue
+		}
+		d = finance.Day(d)
+		if d.Before(start) {
+			start = d.AddDate(0, 0, -edgePadDays)
+		}
+		if d.After(end) {
+			end = d.AddDate(0, 0, edgePadDays)
+		}
+	}
+	return start.Format(finance.DateLayout), end.Format(finance.DateLayout)
 }
 
 func ptr(v int64) *int64 { return &v }

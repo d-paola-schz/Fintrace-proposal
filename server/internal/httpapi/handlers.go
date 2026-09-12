@@ -91,6 +91,7 @@ func (s *Server) handleWorkspace(w http.ResponseWriter, r *http.Request) {
 	b := s.builder(r.Context())
 	resp := b.Build(contracts.ScenarioRequest{})
 	resp.SourceStatus = s.sourceStatus()
+	resp.Sanitize()
 	writeJSON(w, http.StatusOK, resp)
 }
 
@@ -148,6 +149,7 @@ func (s *Server) handleScenario(w http.ResponseWriter, r *http.Request) {
 	}
 	resp := b.Build(req)
 	resp.SourceStatus = s.sourceStatus()
+	resp.Sanitize()
 	writeJSON(w, http.StatusOK, resp)
 }
 
@@ -188,7 +190,10 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	ws := b.Build(scenario)
-	writeJSON(w, http.StatusOK, s.answer(r.Context(), b, ws, req))
+	ws.Sanitize()
+	answer := s.answer(r.Context(), b, ws, req)
+	answer.Sanitize()
+	writeJSON(w, http.StatusOK, answer)
 }
 
 // answer routes the question, gathers the engine's own facts, and asks the

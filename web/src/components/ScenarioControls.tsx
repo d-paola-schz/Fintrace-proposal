@@ -196,7 +196,7 @@ export function AlternativesBar({
   scenario: ScenarioRequest
   onChange: (req: ScenarioRequest) => void
 }) {
-  const alts = ws.scenario.alternatives
+  const alts = ws.scenario.alternatives ?? []
   if (!ws.scenario.proposal || alts.length === 0) return null
   const current = ws.scenario
 

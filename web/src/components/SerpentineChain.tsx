@@ -13,7 +13,10 @@ import { STATUS_LABEL } from '../lib/format'
 // strand meets one edge of the node and resumes at the opposite edge.
 
 export const NODE_W = 272
+/** Comfortable node height. Short viewports shrink this — see ChainMetrics. */
 export const NODE_H = 60
+/** Node height when vertical room is tight (720p projectors, 768p laptops). */
+export const NODE_H_COMPACT = 48
 const TURN = 15 // corner radius of a switchback turn
 
 export interface ChainMetrics {
@@ -23,9 +26,13 @@ export interface ChainMetrics {
   levelGap: number
   /** from the anchor to the first level line */
   firstLevel: number
+  /** height of a node box; shrinks when the workspace is short */
+  nodeH: number
 }
 
-export const DEFAULT_METRICS: ChainMetrics = { run: 376, levelGap: 84, firstLevel: 32 }
+export const DEFAULT_METRICS: ChainMetrics = {
+  run: 376, levelGap: 84, firstLevel: 32, nodeH: NODE_H,
+}
 
 export interface ChainLayout {
   levels: { y: number; nodeX: number; node: ChainNode }[]
@@ -52,7 +59,7 @@ export function layoutChain(
   flip: boolean,
   metrics: ChainMetrics = DEFAULT_METRICS,
 ): ChainLayout {
-  const { run: RUN, levelGap: LEVEL_GAP, firstLevel: FIRST_LEVEL } = metrics
+  const { run: RUN, levelGap: LEVEL_GAP, firstLevel: FIRST_LEVEL, nodeH } = metrics
   const sign = flip ? -1 : 1
   const xA = anchorX
   const xB = anchorX + sign * RUN
@@ -116,8 +123,8 @@ export function layoutChain(
     segments,
     minX: Math.min(xA, xB) - 10,
     maxX: Math.max(xA, xB) + 10,
-    minY: Math.min(anchorY, ...ys) - NODE_H / 2,
-    maxY: Math.max(anchorY, ...ys) + NODE_H / 2,
+    minY: Math.min(anchorY, ...ys) - nodeH / 2,
+    maxY: Math.max(anchorY, ...ys) + nodeH / 2,
   }
 }
 
@@ -156,15 +163,18 @@ export function ChainNodeCard({
   node,
   x,
   y,
+  h = NODE_H,
   selected,
   onSelect,
 }: {
   node: ChainNode
   x: number
   y: number
+  h?: number
   selected: boolean
   onSelect: (id: string) => void
 }) {
+  const compact = h < NODE_H
   const t = TONE_STYLE[node.tone]
   return (
     <button
@@ -176,9 +186,9 @@ export function ChainNodeCard({
       }`}
       style={{
         left: x - NODE_W / 2,
-        top: y - NODE_H / 2,
+        top: y - h / 2,
         width: NODE_W,
-        height: NODE_H,
+        height: h,
         background: t.fill,
       }}
     >
@@ -197,9 +207,13 @@ export function ChainNodeCard({
           <span className="mt-[1px] block text-[12px] font-semibold leading-[1.25] text-ink line-clamp-2">
             {node.title}
           </span>
-          <span className="mt-[1px] block truncate text-[10px] leading-tight text-muted">
-            {node.summary}
-          </span>
+          {/* The summary is the first thing to go when height is scarce; the
+              title and the tone still carry the meaning. */}
+          {!compact && (
+            <span className="mt-[1px] block truncate text-[10px] leading-tight text-muted">
+              {node.summary}
+            </span>
+          )}
         </span>
       </span>
     </button>

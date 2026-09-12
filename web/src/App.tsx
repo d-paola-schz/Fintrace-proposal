@@ -5,6 +5,7 @@ import { TimelineWorkspace } from './components/TimelineWorkspace'
 import { NodeEvidencePanel } from './components/NodeEvidencePanel'
 import { AlternativesBar, ScenarioControls } from './components/ScenarioControls'
 import { ToneMark } from './components/Tone'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { TONE_STYLE } from './components/Tone'
 
 const EMPTY: ScenarioRequest = { payoutDelayDays: 0, proposal: null }
@@ -118,7 +119,7 @@ export default function App() {
         </span>
 
         <div className="ml-auto flex items-center gap-3">
-          {ws.sourceStatus.map((s) => (
+          {(ws.sourceStatus ?? []).map((s) => (
             <StatusDot key={s.name} status={s} />
           ))}
           <button
@@ -164,27 +165,31 @@ export default function App() {
 
       <main className="flex min-h-0 flex-1">
         <section className="min-w-0 flex-1">
-          <TimelineWorkspace
+          <ErrorBoundary area="The timeline">
+            <TimelineWorkspace
             ws={ws}
             selectedNodeId={nodeId}
             selectedEventId={eventId}
             onSelectNode={selectNode}
-            onSelectEvent={selectEvent}
-          />
+              onSelectEvent={selectEvent}
+            />
+          </ErrorBoundary>
         </section>
         <aside className="w-[410px] shrink-0 border-l border-hair bg-white">
-          <NodeEvidencePanel
+          <ErrorBoundary area="The detail panel">
+            <NodeEvidencePanel
             ws={ws}
             node={node}
             event={event}
             scenario={scenario}
             onApplyScenario={applyScenario}
             onSelectNode={selectNode}
-            onClose={() => {
-              setNodeId(null)
-              setEventId(null)
-            }}
-          />
+              onClose={() => {
+                setNodeId(null)
+                setEventId(null)
+              }}
+            />
+          </ErrorBoundary>
         </aside>
       </main>
 
@@ -239,7 +244,7 @@ function SourcePanel({ ws, onClose }: { ws: WorkspaceResponse; onClose: () => vo
         </button>
       </div>
       <div className="mt-2 grid gap-2 md:grid-cols-3">
-        {ws.sourceStatus.map((s) => (
+        {(ws.sourceStatus ?? []).map((s) => (
           <div
             key={s.name}
             className={`rounded-lg border p-2.5 ${
@@ -266,7 +271,7 @@ function SourcePanel({ ws, onClose }: { ws: WorkspaceResponse; onClose: () => vo
         ))}
       </div>
       <div className="mt-2 grid gap-2 md:grid-cols-2">
-        {ws.assumptions.map((a) => (
+        {(ws.assumptions ?? []).map((a) => (
           <div key={a.id} className="rounded-lg border border-hair bg-white p-2.5">
             <div className="flex items-start justify-between gap-2">
               <p className="text-[11.5px] font-semibold text-ink">{a.label}</p>
