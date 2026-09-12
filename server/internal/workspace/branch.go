@@ -3,6 +3,7 @@ package workspace
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/preflight/preflight/server/internal/contracts"
@@ -26,6 +27,7 @@ func BuildBranch(plan, whatIf contracts.WorkspaceResponse) *contracts.WhatIfBran
 		RemovedEventIDs:   []string{},
 		ChangedChainIDs:   []string{},
 		UnchangedChainIDs: []string{},
+		Moves:             []contracts.EventMove{},
 	}
 
 	start := ""
@@ -55,6 +57,9 @@ func BuildBranch(plan, whatIf contracts.WorkspaceResponse) *contracts.WhatIfBran
 		if ok {
 			// A moved event diverges from where it used to be, not where it went.
 			earliest(old.Date)
+			if m, moved := moveOf(old, e); moved {
+				br.Moves = append(br.Moves, m)
+			}
 		}
 	}
 	for _, e := range plan.Events {
@@ -85,6 +90,21 @@ func BuildBranch(plan, whatIf contracts.WorkspaceResponse) *contracts.WhatIfBran
 
 	br.Note = branchNote(sameTitles, br.UnchangedEventCount, len(br.ChangedChainIDs))
 	return br
+}
+
+// moveOf reports whether the what-if copy of an event sits on a different day
+// from the plan's, and by how many whole days.
+func moveOf(old, now contracts.FinancialEvent) (contracts.EventMove, bool) {
+	if old.Date == now.Date {
+		return contracts.EventMove{}, false
+	}
+	from, errA := finance.ParseDate(old.Date)
+	to, errB := finance.ParseDate(now.Date)
+	if errA != nil || errB != nil {
+		return contracts.EventMove{}, false
+	}
+	days := int(math.Round(finance.Day(to).Sub(finance.Day(from)).Hours() / 24))
+	return contracts.EventMove{EventID: now.ID, FromDate: old.Date, ToDate: now.Date, Days: days}, true
 }
 
 // sameJSON reports whether two values serialize identically. A value that

@@ -455,6 +455,18 @@ type WhatIfBranch struct {
 	UnchangedEventCount int `json:"unchangedEventCount"`
 	// Note says in words that only differences are drawn, and what was left out.
 	Note string `json:"note"`
+	// Moves are events the what-if keeps but puts on a different day, so the
+	// timeline can show where each one was and where it went.
+	Moves []EventMove `json:"moves"`
+}
+
+// EventMove is one event the what-if moves to another day.
+type EventMove struct {
+	EventID  string `json:"eventId"`
+	FromDate string `json:"fromDate"`
+	ToDate   string `json:"toDate"`
+	// Days is ToDate minus FromDate in whole days; positive means later.
+	Days int `json:"days"`
 }
 
 // Outlook is the first thing the owner reads: where the plan stands, and
@@ -694,6 +706,7 @@ func (w *WorkspaceResponse) Sanitize() {
 		w.Branch.RemovedEventIDs = nonNil(w.Branch.RemovedEventIDs)
 		w.Branch.ChangedChainIDs = nonNil(w.Branch.ChangedChainIDs)
 		w.Branch.UnchangedChainIDs = nonNil(w.Branch.UnchangedChainIDs)
+		w.Branch.Moves = nonNil(w.Branch.Moves)
 	}
 	w.Scenario.Sanitize()
 }

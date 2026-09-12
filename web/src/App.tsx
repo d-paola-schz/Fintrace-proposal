@@ -94,8 +94,25 @@ export default function App() {
         if (kind === 'node') return next.chains.some((c) => changed.has(c.id) && c.nodes.some((n) => n.id === ref.id))
         return next.events.some((e) => e.id === ref.id)
       }
-      setOpenChain((c) => (stillThere(c, 'chain') ? c : null))
-      setNodeRef((n) => (stillThere(n, 'node') ? n : null))
+      // A what-if applied while a plan chain is open moves the reader onto that
+      // chain's what-if version, at the step they were reading. If the what-if
+      // leaves that chain as it was, the camera steps back instead, so the new
+      // branch is on screen rather than hidden behind the plan chain.
+      const changedIds = new Set(next?.branch?.changedChainIds ?? [])
+      const jump = !!next && isWhatIf(req)
+      setOpenChain((c) => {
+        if (jump && c?.lane === 'plan') return changedIds.has(c.id) ? { id: c.id, lane: 'whatif' } : null
+        return stillThere(c, 'chain') ? c : null
+      })
+      setNodeRef((n) => {
+        if (jump && n?.lane === 'plan') {
+          const onBranch = next!.chains.some(
+            (ch) => changedIds.has(ch.id) && ch.nodes.some((x) => x.id === n.id),
+          )
+          return onBranch ? { id: n.id, lane: 'whatif' } : null
+        }
+        return stillThere(n, 'node') ? n : null
+      })
       setEventRef((e) => (stillThere(e, 'event') ? e : null))
       setInsight((l) => (l === 'whatif' && !next ? null : l))
     } catch (e) {

@@ -161,3 +161,30 @@ func TestTheBranchNeverStartsBeforeToday(t *testing.T) {
 		}
 	}
 }
+
+// A delay moves the payout; the branch must say from where, to where, and by
+// how much, so the timeline can draw the move rather than leave it to be found.
+func TestADelayRecordsWhereThePayoutMoved(t *testing.T) {
+	b := testBuilder(t)
+	payout, _ := findEvent(b.Build(contracts.ScenarioRequest{}).Events, "evt-payout")
+	from, err := finance.ParseDate(payout.Date)
+	if err != nil {
+		t.Fatalf("plan payout date %q: %v", payout.Date, err)
+	}
+	want := contracts.EventMove{
+		EventID: "evt-payout", FromDate: payout.Date,
+		ToDate: from.AddDate(0, 0, 5).Format(finance.DateLayout), Days: 5,
+	}
+	br := b.Build(contracts.ScenarioRequest{PayoutDelayDays: 5}).Branch
+	if len(br.Moves) != 1 || br.Moves[0] != want {
+		t.Fatalf("moves = %+v, want exactly %+v", br.Moves, want)
+	}
+}
+
+// A purchase adds an event and moves none.
+func TestAPurchaseMovesNothing(t *testing.T) {
+	br := testBuilder(t).Build(contracts.ScenarioRequest{Proposal: adCampaign()}).Branch
+	if len(br.Moves) != 0 {
+		t.Fatalf("a purchase moved events: %+v", br.Moves)
+	}
+}

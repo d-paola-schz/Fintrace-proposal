@@ -362,6 +362,13 @@ export function TimelineWorkspace({
       base = grow(base, {
         x0: focusLayout.anchorX - 24, x1: focusLayout.anchorX + 24, y0: branchY - 24, y1: branchY + 24,
       })
+      // If the chain hangs from an event the what-if moved, the move is part of
+      // the subject: arriving on the chain shows where the event came from.
+      for (const m of branch?.moves ?? []) {
+        if (m.eventId !== focusLayout.chain.rootEventId) continue
+        const gx = x(m.fromDate)
+        base = grow(base, { x0: gx - 30, x1: gx + 30, y0: branchY - 16, y1: branchY + 40 })
+      }
     }
 
     // What the step points at, if the frame can hold it legibly.
@@ -384,7 +391,7 @@ export function TimelineWorkspace({
 
     return { k, tx: availW / 2 - k * cx + frozen.left, ty: availH / 2 - k * cy + frozen.top, view }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusLayout, frameW, frameH, panelW, placed, cardH, axisY, branchY, revealed, revealedBranch, wi, x, frozen])
+  }, [focusLayout, frameW, frameH, panelW, placed, cardH, axisY, branchY, revealed, revealedBranch, wi, branch, x, frozen])
 
   /** A revealed event gets a card only if the camera's frame actually holds it. */
   const inFrame = (x0: number, y0: number, y1: number) => {
@@ -534,6 +541,10 @@ export function TimelineWorkspace({
               <filter id="railShadow" x="-2%" y="-320%" width="104%" height="740%">
                 <feDropShadow dx="0" dy="2" stdDeviation="2.4" floodColor="#17408f" floodOpacity="0.24" />
               </filter>
+              <marker id="moveArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7"
+                markerHeight="7" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10 z" fill="#5b21b6" />
+              </marker>
               <filter id="railShadowWhatIf" x="-2%" y="-320%" width="104%" height="740%">
                 <feDropShadow dx="0" dy="2" stdDeviation="2.4" floodColor="#4c1d95" floodOpacity="0.26" />
               </filter>
@@ -574,36 +585,22 @@ export function TimelineWorkspace({
               <line x1={todayX} y1={24} x2={todayX} y2={canvasH - 24}
                 stroke="var(--color-flow)" strokeWidth={1.25} strokeDasharray="2 7" opacity={0.3} />
 
-              {lowMark != null && (
-                <g>
-                  <line x1={lowMark} y1={axisY - RAIL_H / 2 - 16} x2={lowMark} y2={axisY - RAIL_H / 2}
-                    stroke={ws.scenario.breachesReserve ? '#ad4318' : '#15803d'} strokeWidth={1.6} />
-                  <circle cx={lowMark} cy={axisY} r={4.6} fill="#fff"
-                    stroke={ws.scenario.breachesReserve ? '#ad4318' : '#15803d'} strokeWidth={2.4} />
-                </g>
-              )}
-              {breachMark != null && breachMark !== lowMark && (
-                <g>
-                  <line x1={breachMark} y1={axisY - RAIL_H / 2 - 16} x2={breachMark}
-                    y2={axisY - RAIL_H / 2} stroke="#ad4318" strokeWidth={1.6} strokeDasharray="3 3" />
-                  <circle cx={breachMark} cy={axisY} r={4.2} fill="#fff" stroke="#ad4318" strokeWidth={2.2} />
-                </g>
-              )}
             </g>
 
             {/* The what-if: a purple rail that leaves the plan just before the
                 first day the two differ. It is all projection, so it is hatched
                 along its whole length. */}
             {branch && (
-              <g style={{
+              <g key={branchKey} style={{
                 opacity: branchHidden ? 0 : focused && !focusIsBranch ? CONTEXT_DIM : 1,
                 transition: 'opacity 380ms ease',
               }}>
                 <path
                   d={`M ${branchFromX} ${axisY + RAIL_H / 2} L ${branchFromX} ${branchY - 26} Q ${branchFromX} ${branchY} ${branchFromX + 26} ${branchY} L ${branchStartX} ${branchY}`}
                   fill="none" stroke="#8b5cf6" strokeWidth={4} strokeLinecap="round"
-                  strokeLinejoin="round" opacity={0.8}
+                  strokeLinejoin="round" opacity={0.8} pathLength={1} className="branch-draw"
                 />
+                <g className="branch-grow">
                 <g filter="url(#railShadowWhatIf)">
                   <rect x={branchStartX - RAIL_H / 2} y={branchY - RAIL_H / 2}
                     width={Math.max(RAIL_H, branchEndX - branchStartX + RAIL_H / 2)} height={RAIL_H}
@@ -615,22 +612,7 @@ export function TimelineWorkspace({
                 <line x1={branchStartX} y1={branchY - RAIL_H / 2 + 1.6} x2={branchEndX - 4}
                   y2={branchY - RAIL_H / 2 + 1.6} stroke="#ffffff" strokeWidth={1.2}
                   opacity={0.42} strokeLinecap="round" />
-
-                {wLowX != null && wRes && (
-                  <g>
-                    <line x1={wLowX} y1={branchY - RAIL_H / 2 - 16} x2={wLowX} y2={branchY - RAIL_H / 2}
-                      stroke={wRes.breachesReserve ? '#ad4318' : '#15803d'} strokeWidth={1.6} />
-                    <circle cx={wLowX} cy={branchY} r={4.6} fill="#fff"
-                      stroke={wRes.breachesReserve ? '#ad4318' : '#15803d'} strokeWidth={2.4} />
-                  </g>
-                )}
-                {wBreachX != null && wBreachX !== wLowX && (
-                  <g>
-                    <line x1={wBreachX} y1={branchY - RAIL_H / 2 - 16} x2={wBreachX}
-                      y2={branchY - RAIL_H / 2} stroke="#ad4318" strokeWidth={1.6} strokeDasharray="3 3" />
-                    <circle cx={wBreachX} cy={branchY} r={4.2} fill="#fff" stroke="#ad4318" strokeWidth={2.2} />
-                  </g>
-                )}
+                </g>
 
                 {/* stems for what-if events showing a card */}
                 {branchEvents.filter((e) => revealedBranch.has(e.id)).map((e) => (
@@ -746,7 +728,7 @@ export function TimelineWorkspace({
           })}
 
           {branch && wi && (
-            <>
+            <div key={branchKey} className="branch-fade">
               {/* The name of the what-if, the way back, and what it leaves out.
                   It stays readable while a what-if chain is open: the owner must
                   never lose track of reading a hypothetical. */}
@@ -773,6 +755,14 @@ export function TimelineWorkspace({
                   </button>
                 </div>
                 <p className="mt-1 text-[11px] leading-snug text-[#5b4a7a]">{branch.note}</p>
+                {(branch.moves ?? []).map((m) => {
+                  const ev = wi.events.find((e) => e.id === m.eventId)
+                  return (
+                    <span key={m.eventId} className="sr-only">
+                      {ev?.label ?? 'An event'} moves from {shortDate(m.fromDate)} to {shortDate(m.toDate)}.
+                    </span>
+                  )
+                })}
               </section>
 
               {branchHighlight && (
@@ -822,8 +812,76 @@ export function TimelineWorkspace({
                       dir={1} active={false} dimmed={focused} onOpen={(id) => onToggleChain(id, 'whatif')} />
                   )
                 })}
-            </>
+            </div>
           )}
+
+          {/* Marks that must read on top of the coloured band: where cash bottoms
+              out, where it breaks the reserve, and where a moved event used to be.
+              The band is an HTML layer above the rail drawing, so these get their
+              own layer above the band. It never takes the pointer. */}
+          <svg className="pointer-events-none absolute inset-0 z-[6]" width={canvasW} height={canvasH} aria-hidden>
+            <g style={{ opacity: focused ? CONTEXT_DIM : 1, transition: 'opacity 380ms ease' }}>
+              {lowMark != null && (
+                <g>
+                  <line x1={lowMark} y1={axisY - RAIL_H / 2 - 16} x2={lowMark} y2={axisY - RAIL_H / 2}
+                    stroke={ws.scenario.breachesReserve ? '#ad4318' : '#15803d'} strokeWidth={1.6} />
+                  <circle cx={lowMark} cy={axisY} r={4.6} fill="#fff"
+                    stroke={ws.scenario.breachesReserve ? '#ad4318' : '#15803d'} strokeWidth={2.4} />
+                </g>
+              )}
+              {breachMark != null && breachMark !== lowMark && (
+                <g>
+                  <line x1={breachMark} y1={axisY - RAIL_H / 2 - 16} x2={breachMark}
+                    y2={axisY - RAIL_H / 2} stroke="#ad4318" strokeWidth={1.6} strokeDasharray="3 3" />
+                  <circle cx={breachMark} cy={axisY} r={4.2} fill="#fff" stroke="#ad4318" strokeWidth={2.2} />
+                </g>
+              )}
+            </g>
+            {branch && (
+              <g key={branchKey} style={{ opacity: branchHidden ? 0 : 1, transition: 'opacity 380ms ease' }}>
+                {/* Where a moved event used to be, and how far it went. The count
+                    is the server's; nothing here is measured from the drawing. */}
+                {(branch.moves ?? []).map((m) => {
+                  const x0 = x(m.fromDate)
+                  const x1 = x(m.toDate)
+                  const dir = x1 >= x0 ? 1 : -1
+                  const n = Math.abs(m.days)
+                  return (
+                    <g key={`mv-${m.eventId}`} className="branch-fade">
+                      <circle cx={x0} cy={branchY} r={9} fill="#ffffff" stroke="#7c3aed"
+                        strokeWidth={1.6} strokeDasharray="3 2.5" opacity={0.95} />
+                      <path
+                        d={`M ${x0 + dir * 12} ${branchY + 10} Q ${(x0 + x1) / 2} ${branchY + 32} ${x1 - dir * 15} ${branchY + 11}`}
+                        fill="none" stroke="#5b21b6" strokeWidth={1.6} strokeDasharray="4 3"
+                        markerEnd="url(#moveArrow)"
+                      />
+                      <text x={x0} y={branchY + (focusIsBranch ? 29 : 36)} textAnchor="middle"
+                        fontSize={10.5} fontWeight={600} fill="#5b21b6" className="tnum">
+                        {m.days > 0 ? '+' : '−'}{n} {n === 1 ? 'day' : 'days'}
+                      </text>
+                    </g>
+                  )
+                })}
+
+                {wLowX != null && wRes && (
+                  <g>
+                    <line x1={wLowX} y1={branchY - RAIL_H / 2 - 16} x2={wLowX} y2={branchY - RAIL_H / 2}
+                      stroke={wRes.breachesReserve ? '#ad4318' : '#15803d'} strokeWidth={1.6} />
+                    <circle cx={wLowX} cy={branchY} r={4.6} fill="#fff"
+                      stroke={wRes.breachesReserve ? '#ad4318' : '#15803d'} strokeWidth={2.4} />
+                  </g>
+                )}
+                {wBreachX != null && wBreachX !== wLowX && (
+                  <g>
+                    <line x1={wBreachX} y1={branchY - RAIL_H / 2 - 16} x2={wBreachX}
+                      y2={branchY - RAIL_H / 2} stroke="#ad4318" strokeWidth={1.6} strokeDasharray="3 3" />
+                    <circle cx={wBreachX} cy={branchY} r={4.2} fill="#fff" stroke="#ad4318" strokeWidth={2.2} />
+                  </g>
+                )}
+
+              </g>
+            )}
+          </svg>
 
           {focusLayout && (
             <div>

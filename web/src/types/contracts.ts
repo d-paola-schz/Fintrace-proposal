@@ -362,6 +362,16 @@ export interface WhatIfBranch {
   unchangedEventCount: number
   /** Says that only differences are drawn, and what was left out. */
   note: string
+  /** Events the what-if keeps but puts on a different day. */
+  moves: EventMove[]
+}
+
+export interface EventMove {
+  eventId: string
+  fromDate: string
+  toDate: string
+  /** toDate minus fromDate in whole days; positive means later. */
+  days: number
 }
 
 export interface ChatRequest {
