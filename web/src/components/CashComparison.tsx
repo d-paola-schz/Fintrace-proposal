@@ -1,4 +1,4 @@
-import type { ScenarioResult } from '../types/contracts'
+import type { ScenarioRequest, ScenarioResult, WorkspaceResponse } from '../types/contracts'
 import { shortDate, usd } from '../lib/format'
 
 export const BAND_H = 88
@@ -130,58 +130,97 @@ export function CashComparison({
   )
 }
 
-/** The plain-language headline that sits above the two paths. */
-export function CashComparisonHeadline({ scenario }: { scenario: ScenarioResult }) {
-  const without = scenario.withoutProposal
-  if (!without || !scenario.proposal) return null
-  const breach = scenario.breachesReserve
+/**
+ * The whole decision in one strip: where you were, where this puts you, what it
+ * costs at the tightest day, and the alternatives as peers you can try in a
+ * click. Previously this was two stacked bars competing for the same attention.
+ */
+export function CashComparisonHeadline({
+  ws,
+  scenario,
+  onChange,
+}: {
+  ws: WorkspaceResponse
+  scenario: ScenarioRequest
+  onChange: (req: ScenarioRequest) => void
+}) {
+  const s = ws.scenario
+  const without = s.withoutProposal
+  if (!without || !s.proposal) return null
+  const breach = s.breachesReserve
+  const alts = s.alternatives ?? []
 
   return (
     <div
-      className={`flex flex-wrap items-center gap-x-4 gap-y-1 border-b px-4 py-2 ${
+      className={`border-b px-4 py-2 ${
         breach ? 'border-[#e6c7ae] bg-[#fdf3ec]' : 'border-[#d9caec] bg-[#f9f6fd]'
       }`}
     >
-      <span className="flex items-center gap-1.5">
-        <span className="h-[3px] w-5 rounded" style={{ background: NOW_COLOUR, opacity: 0.55 }} />
-        <span className="text-[11px] text-muted">Without this spend</span>
-        <span className="tnum text-[12.5px] font-semibold text-ink">
-          {usd(without.lowestCents)}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+        <span className="flex items-center gap-1.5">
+          <span className="h-[3px] w-5 rounded" style={{ background: NOW_COLOUR, opacity: 0.55 }} />
+          <span className="text-[11px] text-muted">Without it</span>
+          <span className="tnum text-[12.5px] font-semibold text-ink">
+            {usd(without.lowestCents)}
+          </span>
         </span>
-      </span>
 
-      <span className="text-[13px] text-muted">→</span>
+        <span className="text-[13px] text-muted">→</span>
 
-      <span className="flex items-center gap-1.5">
-        <span className="h-[3px] w-5 rounded" style={{ background: SPEND_COLOUR }} />
-        <span className="text-[11px] text-muted">With it</span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-[3px] w-5 rounded" style={{ background: SPEND_COLOUR }} />
+          <span className="text-[11px] text-muted">With it</span>
+          <span
+            className={`tnum text-[12.5px] font-semibold ${breach ? 'text-[#8a4a1f]' : 'text-ink'}`}
+          >
+            {usd(s.lowestCents)}
+          </span>
+        </span>
+
         <span
-          className={`tnum text-[12.5px] font-semibold ${breach ? 'text-[#8a4a1f]' : 'text-ink'}`}
+          className={`tnum rounded px-2 py-[3px] text-[11.5px] font-semibold text-white ${
+            breach ? 'bg-[#8a4a1f]' : 'bg-[#54397e]'
+          }`}
         >
-          {usd(scenario.lowestCents)}
+          {usd(s.deltaLowestCents)} at the tightest day
         </span>
-      </span>
 
-      <span
-        className={`tnum rounded px-2 py-[3px] text-[11.5px] font-semibold ${
-          breach ? 'bg-[#8a4a1f] text-white' : 'bg-[#54397e] text-white'
-        }`}
-      >
-        {usd(scenario.deltaLowestCents)} at the tightest day
-      </span>
+        <span className="text-[11.5px] leading-snug text-[#3d4757]">
+          {breach ? (
+            <>
+              <strong>{usd(-s.headroomCents)} below</strong> your reserve on{' '}
+              {shortDate(s.firstBreachDate ?? s.lowestDate)}.
+            </>
+          ) : (
+            <>
+              <strong>{usd(s.headroomCents)} above</strong> your reserve.
+            </>
+          )}
+        </span>
+      </div>
 
-      <span className="text-[11.5px] leading-snug text-[#3d4757]">
-        {breach ? (
-          <>
-            That is <strong>{usd(-scenario.headroomCents)} below</strong> your reserve on{' '}
-            {shortDate(scenario.firstBreachDate ?? scenario.lowestDate)}.
-          </>
-        ) : (
-          <>
-            Still <strong>{usd(scenario.headroomCents)} above</strong> your reserve.
-          </>
-        )}
-      </span>
+      {alts.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.07em] text-muted">
+            Instead
+          </span>
+          {alts.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              onClick={() => onChange({ ...scenario, proposal: a.proposal })}
+              title={a.tradeoff}
+              className={`tnum rounded-full border px-2.5 py-[3px] text-[11px] transition-colors ${
+                a.breachesReserve
+                  ? 'border-[#e6c7ae] bg-white text-[#8a4a1f] hover:bg-[#fdf3ec]'
+                  : 'border-[#c2e2ce] bg-white text-[#1f5c3c] hover:bg-[#f4fbf7]'
+              }`}
+            >
+              {a.label} · {a.breachesReserve ? 'still below' : 'holds'} {usd(a.lowestCents)}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

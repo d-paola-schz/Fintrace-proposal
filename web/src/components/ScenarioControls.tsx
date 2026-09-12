@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ScenarioRequest, WorkspaceResponse } from '../types/contracts'
-import { addDays, shortDate, usd } from '../lib/format'
+import { addDays, shortDate } from '../lib/format'
 
 /** Deterministic controls for the two things the owner can change: when the
  *  payout lands, and what they are thinking of spending. Everything here is a
@@ -186,77 +186,5 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       </span>
       {children}
     </label>
-  )
-}
-
-export function AlternativesBar({
-  ws, scenario, onChange,
-}: {
-  ws: WorkspaceResponse
-  scenario: ScenarioRequest
-  onChange: (req: ScenarioRequest) => void
-}) {
-  const alts = ws.scenario.alternatives ?? []
-  if (!ws.scenario.proposal || alts.length === 0) return null
-  const current = ws.scenario
-
-  return (
-    <div className="flex flex-wrap items-stretch gap-2 border-b border-hair bg-[#fbfcfd] px-4 py-2">
-      <Card
-        title="As proposed"
-        amount={usd(current.proposal!.amountCents)}
-        date={current.proposal!.date}
-        lowest={current.lowestCents}
-        lowestDate={current.lowestDate}
-        breach={current.breachesReserve}
-        active
-      />
-      {alts.map((a) => (
-        <button
-          key={a.id}
-          type="button"
-          onClick={() => onChange({ ...scenario, proposal: a.proposal })}
-          className="text-left"
-        >
-          <Card
-            title={a.label}
-            amount={usd(a.proposal.amountCents)}
-            date={a.proposal.date}
-            lowest={a.lowestCents}
-            lowestDate={a.lowestDate}
-            breach={a.breachesReserve}
-            tradeoff={a.tradeoff}
-          />
-        </button>
-      ))}
-    </div>
-  )
-}
-
-function Card({
-  title, amount, date, lowest, lowestDate, breach, active, tradeoff,
-}: {
-  title: string; amount: string; date: string; lowest: number; lowestDate: string
-  breach: boolean; active?: boolean; tradeoff?: string
-}) {
-  return (
-    <div
-      className={`h-full min-w-[190px] max-w-[260px] rounded-lg border px-2.5 py-1.5 ${
-        active ? 'border-[#c8d9f7] bg-white' : 'border-hair bg-white hover:border-[#c8d9f7]'
-      }`}
-    >
-      <p className="truncate text-[11px] font-semibold text-ink">{title}</p>
-      <p className="tnum text-[10.5px] text-muted">
-        {amount} · {shortDate(date)}
-      </p>
-      <p
-        className={`tnum mt-1 text-[11px] font-semibold ${
-          breach ? 'text-[#8a4a1f]' : 'text-[#15803d]'
-        }`}
-      >
-        {breach ? 'below reserve' : 'holds reserve'} · low {usd(lowest)} {shortDate(lowestDate)}
-      </p>
-      {tradeoff && <p className="mt-0.5 line-clamp-2 text-[9.5px] leading-snug text-muted">{tradeoff}</p>}
-    </div>
   )
 }

@@ -3,7 +3,7 @@ import type { ScenarioRequest, SourceStatus, WorkspaceResponse } from './types/c
 import { api } from './lib/api'
 import { TimelineWorkspace } from './components/TimelineWorkspace'
 import { NodeEvidencePanel } from './components/NodeEvidencePanel'
-import { AlternativesBar, ScenarioControls } from './components/ScenarioControls'
+import { ScenarioControls } from './components/ScenarioControls'
 import { CashComparisonHeadline } from './components/CashComparison'
 import { ToneMark } from './components/Tone'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -161,8 +161,7 @@ export default function App() {
         onChange={applyScenario}
         onReset={() => applyScenario(EMPTY)}
       />
-      <CashComparisonHeadline scenario={ws.scenario} />
-      <AlternativesBar ws={ws} scenario={scenario} onChange={applyScenario} />
+      <CashComparisonHeadline ws={ws} scenario={scenario} onChange={applyScenario} />
 
       {error && (
         <p className="shrink-0 bg-[#fdf3ec] px-4 py-1.5 text-[11.5px] text-[#8a4a1f]">{error}</p>
