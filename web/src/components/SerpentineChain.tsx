@@ -12,7 +12,7 @@ import { STATUS_LABEL } from '../lib/format'
 // a column of cards. A node sits on each level and interrupts the strand: the
 // strand meets one edge of the node and resumes at the opposite edge.
 
-export const NODE_W = 250
+export const NODE_W = 270
 /** Comfortable node height. Short viewports shrink this — see ChainMetrics. */
 export const NODE_H = 44
 /** Node height when vertical room is tight (720p projectors, 768p laptops). */

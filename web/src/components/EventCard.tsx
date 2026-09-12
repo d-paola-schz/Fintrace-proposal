@@ -1,7 +1,7 @@
 import type { FinancialEvent } from '../types/contracts'
 import { CERTAINTY_LABEL, shortDate, usd } from '../lib/format'
 
-export const CARD_W = 172
+export const CARD_W = 186
 export const CARD_H = 50
 /** Card height when vertical room is tight. */
 export const CARD_H_COMPACT = 42
@@ -49,6 +49,7 @@ export function EventCard({
       type="button"
       onClick={() => onSelect(event.id)}
       aria-pressed={selected}
+      title={`${event.label} · ${shortDate(event.date)}`}
       className={`absolute rounded-md border text-left transition-all ${
         selected
           ? 'shadow-[0_0_0_2px_var(--color-flow)] z-20 border-transparent bg-white'
@@ -68,16 +69,16 @@ export function EventCard({
         borderLeftStyle: 'solid',
       }}
     >
-      <span className="flex h-full flex-col justify-center gap-[2px] px-2.5">
+      <span className="flex h-full flex-col justify-center gap-[2px] overflow-hidden px-2.5">
         <span className="flex items-baseline justify-between gap-1">
-          <span className="truncate text-[11.5px] font-semibold leading-tight text-ink">
+          <span className="min-w-0 flex-1 truncate text-[11.5px] font-semibold leading-tight text-ink">
             {event.label}
           </span>
           <span className="tnum shrink-0 text-[10px] text-muted">{shortDate(event.date)}</span>
         </span>
         <span className="flex items-center justify-between gap-1">
           <span
-            className={`tnum text-[13px] font-semibold leading-none ${
+            className={`tnum shrink-0 text-[13px] font-semibold leading-none ${
               amount ? 'text-[#15803d]' : 'text-[#b4501f]'
             }`}
           >
@@ -85,17 +86,24 @@ export function EventCard({
               ? usd(event.amountCents)
               : usd(event.amountCents, { sign: event.amountCents > 0 })}
           </span>
-          <span className="flex items-center gap-1">
+          <span className="flex min-w-0 items-center gap-1">
+            {/* A glyph rather than the word "chain": it says the same thing in a
+                tenth of the width, which is what pushed the status label out of
+                the card. */}
             {hasChain && (
-              <span
-                className="text-[9px] font-semibold uppercase tracking-[0.06em] text-muted"
-                title="This event has a chain"
+              <svg
+                width="13" height="8" viewBox="0 0 13 8" aria-hidden
+                className="shrink-0 text-muted"
               >
-                chain
-              </span>
+                <title>This event has a chain</title>
+                <rect x="0.9" y="1.4" width="6.6" height="5.2" rx="2.6"
+                  fill="none" stroke="currentColor" strokeWidth="1.3" />
+                <rect x="5.5" y="1.4" width="6.6" height="5.2" rx="2.6"
+                  fill="none" stroke="currentColor" strokeWidth="1.3" />
+              </svg>
             )}
             <span
-              className={`text-[9px] font-semibold uppercase tracking-[0.05em] ${
+              className={`truncate text-[9px] font-semibold uppercase tracking-[0.05em] ${
                 projected ? 'text-[#8a6d1f]' : 'text-muted'
               }`}
             >

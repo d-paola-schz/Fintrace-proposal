@@ -17,7 +17,7 @@
   "baseline": {
     "id": "asm-baseline",
     "label": "Opening cash balance",
-    "detail": "Cash on hand at the start of the projection. Taken from the Nessie sandbox account when a key is configured, otherwise from the committed demo fixture. Only future events change it — historical transactions are never re-added.",
+    "detail": "Cash on hand at the start of the projection. Taken from the Nessie sandbox account when a key is configured, otherwise from the committed demo fixture. Only future events change it \u2014 historical transactions are never re-added.",
     "provenance": "nessie_sandbox"
   },
   "reserve": {
@@ -39,7 +39,7 @@
   },
   "payout": {
     "id": "asm-payout",
-    "label": "Expected marketplace payout",
+    "label": "Marketplace payout",
     "offsetDaysFromToday": 8,
     "detail": "The date and amount of a marketplace payout are modeled. Olist contains no payout records, and the Nessie sandbox account is unrelated mock banking data, so no deposit in it corresponds to these orders. Drag the date to test other timings.",
     "provenance": "demo_assumption",
@@ -58,7 +58,7 @@
     },
     {
       "id": "asm-ads",
-      "label": "Scheduled ad spend",
+      "label": "Ad spend",
       "offsetDaysFromToday": 3,
       "amountCents": -118000,
       "currency": "USD",
@@ -76,10 +76,10 @@
     }
   ],
   "notDerivable": [
-    "Stock on hand — no inventory table exists in the Olist release.",
-    "Unit cost / cost of goods sold — not published for any seller.",
-    "Gross margin and net margin — cannot be computed without recorded costs.",
-    "Actual payout dates and amounts — no payout ledger exists in the source.",
-    "Any link between an Olist order and a Nessie transaction — the two datasets are unrelated."
+    "Stock on hand \u2014 no inventory table exists in the Olist release.",
+    "Unit cost / cost of goods sold \u2014 not published for any seller.",
+    "Gross margin and net margin \u2014 cannot be computed without recorded costs.",
+    "Actual payout dates and amounts \u2014 no payout ledger exists in the source.",
+    "Any link between an Olist order and a Nessie transaction \u2014 the two datasets are unrelated."
   ]
 }

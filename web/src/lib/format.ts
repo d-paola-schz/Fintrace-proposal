@@ -59,10 +59,15 @@ export const PROVENANCE_LABEL: Record<string, string> = {
   demo_assumption: 'Demo assumption',
 }
 
+/**
+ * What the owner reads. "conditional" is the engine's word for a modelled
+ * figure; "Projected" is what that means to someone running a shop, and it is
+ * short enough not to push the row out of its card.
+ */
 export const CERTAINTY_LABEL: Record<string, string> = {
   recorded: 'Recorded',
   scheduled: 'Scheduled',
-  conditional: 'Conditional',
+  conditional: 'Projected',
 }
 
 export const TONE_WORD: Record<string, string> = {
