@@ -1,0 +1,12 @@
+{
+  "source": "fixture",
+  "asOf": "",
+  "accountId": "demo-fixture-account",
+  "accountLabel": "Operating account (demo fixture)",
+  "balanceCents": 1248000,
+  "currency": "USD",
+  "detail": "Constructed demo fixture shaped to the Nessie sandbox account schema. It was NOT retrieved from the Nessie API. Set NESSIE_API_KEY to read the live sandbox instead.",
+  "deposits": [],
+  "withdrawals": [],
+  "bills": []
+}

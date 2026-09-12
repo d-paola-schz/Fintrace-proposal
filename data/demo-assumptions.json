@@ -1,0 +1,85 @@
+{
+  "version": "assumptions-v1",
+  "displayCurrency": "USD",
+  "businessTimezone": "America/Sao_Paulo",
+  "fx": {
+    "id": "asm-fx",
+    "brlPerUsd": 5.0,
+    "label": "Demo conversion: R$5.00 = US$1.00",
+    "detail": "A round scenario rate chosen so converted figures are obviously illustrative. It is not the market rate for any date, and every converted number keeps its original BRL value alongside it.",
+    "provenance": "demo_assumption"
+  },
+  "timeShift": {
+    "id": "asm-timeshift",
+    "label": "Time-shifted demo scenario",
+    "detail": "This seller's recorded 2018 order history is redrawn onto the current calendar so the workspace has a present-day timeline. The shapes, counts and amounts are the seller's real recorded values; only the dates are moved. These are not live sales."
+  },
+  "baseline": {
+    "id": "asm-baseline",
+    "label": "Opening cash balance",
+    "detail": "Cash on hand at the start of the projection. Taken from the Nessie sandbox account when a key is configured, otherwise from the committed demo fixture. Only future events change it — historical transactions are never re-added.",
+    "provenance": "nessie_sandbox"
+  },
+  "reserve": {
+    "id": "asm-reserve",
+    "label": "Minimum operating reserve",
+    "amountCents": 500000,
+    "currency": "USD",
+    "detail": "The floor the owner does not want cash to fall below. Owner-set; edit it and every projection recomputes.",
+    "provenance": "user_entered",
+    "editable": true,
+    "field": "reserveCents"
+  },
+  "marketplaceFee": {
+    "id": "asm-fee",
+    "ratePct": 20.0,
+    "label": "Modeled marketplace commission 20%",
+    "detail": "Olist publishes no commission, fee or payout ledger for any seller. A flat 20% is applied to recorded item sales purely to produce a payout figure for this demonstration.",
+    "provenance": "demo_assumption"
+  },
+  "payout": {
+    "id": "asm-payout",
+    "label": "Expected marketplace payout",
+    "offsetDaysFromToday": 8,
+    "detail": "The date and amount of a marketplace payout are modeled. Olist contains no payout records, and the Nessie sandbox account is unrelated mock banking data, so no deposit in it corresponds to these orders. Drag the date to test other timings.",
+    "provenance": "demo_assumption",
+    "editable": true,
+    "field": "payoutDelayDays"
+  },
+  "scheduledOutflows": [
+    {
+      "id": "asm-supplier",
+      "label": "Supplier payment",
+      "offsetDaysFromToday": 5,
+      "amountCents": -460000,
+      "currency": "USD",
+      "detail": "A dated supplier invoice entered for the demonstration. Olist contains no supplier terms or purchase orders.",
+      "provenance": "demo_assumption"
+    },
+    {
+      "id": "asm-ads",
+      "label": "Scheduled ad spend",
+      "offsetDaysFromToday": 3,
+      "amountCents": -118000,
+      "currency": "USD",
+      "detail": "An already-committed advertising charge entered for the demonstration.",
+      "provenance": "demo_assumption"
+    },
+    {
+      "id": "asm-rent",
+      "label": "Warehouse rent",
+      "offsetDaysFromToday": 12,
+      "amountCents": -220000,
+      "currency": "USD",
+      "detail": "A recurring fixed cost entered for the demonstration.",
+      "provenance": "demo_assumption"
+    }
+  ],
+  "notDerivable": [
+    "Stock on hand — no inventory table exists in the Olist release.",
+    "Unit cost / cost of goods sold — not published for any seller.",
+    "Gross margin and net margin — cannot be computed without recorded costs.",
+    "Actual payout dates and amounts — no payout ledger exists in the source.",
+    "Any link between an Olist order and a Nessie transaction — the two datasets are unrelated."
+  ]
+}
