@@ -448,3 +448,56 @@ func TestTimelineWindowCoversADistantProposal(t *testing.T) {
 		t.Fatalf("window ends %s, before the proposal on %s", ws.WindowEnd, far)
 	}
 }
+
+// A proposal must come back with the same window projected without it, so the
+// timeline can draw both paths and the owner reads the cost off the difference
+// rather than being told it.
+func TestProposalReturnsBothCashPaths(t *testing.T) {
+	b := testBuilder(t)
+	date := b.Today.AddDate(0, 0, 4).Format(finance.DateLayout)
+	ws := b.Build(contracts.ScenarioRequest{
+		Proposal: &contracts.ProposedDecision{
+			Description: "Ads", Category: "marketing", Date: date, AmountCents: 300_00,
+		},
+	})
+	s := ws.Scenario
+
+	if s.WithoutProposal == nil {
+		t.Fatal("a proposal must also return the path without it")
+	}
+	if len(s.WithoutProposal.Days) != len(s.Days) {
+		t.Fatalf("paths cover different windows: %d vs %d",
+			len(s.WithoutProposal.Days), len(s.Days))
+	}
+	// Spending money cannot raise the trough.
+	if s.LowestCents > s.WithoutProposal.LowestCents {
+		t.Errorf("the spend raised the lowest point: %d vs %d",
+			s.LowestCents, s.WithoutProposal.LowestCents)
+	}
+	if s.DeltaLowestCents != s.LowestCents-s.WithoutProposal.LowestCents {
+		t.Errorf("delta %d does not match the two paths", s.DeltaLowestCents)
+	}
+	// The two paths must be identical before the spend lands.
+	for i, d := range s.Days {
+		if d.Date >= date {
+			break
+		}
+		if d.ClosingCents != s.WithoutProposal.Days[i].ClosingCents {
+			t.Errorf("%s differs before the spend date: %d vs %d",
+				d.Date, d.ClosingCents, s.WithoutProposal.Days[i].ClosingCents)
+		}
+	}
+}
+
+// With no proposal there is nothing to compare, and the field must be absent
+// rather than an empty shell the UI would try to draw.
+func TestNoProposalMeansNoComparison(t *testing.T) {
+	b := testBuilder(t)
+	ws := b.Build(contracts.ScenarioRequest{})
+	if ws.Scenario.WithoutProposal != nil {
+		t.Fatal("no proposal, so there must be no comparison path")
+	}
+	if ws.Scenario.DeltaLowestCents != 0 {
+		t.Fatalf("delta = %d with no proposal", ws.Scenario.DeltaLowestCents)
+	}
+}

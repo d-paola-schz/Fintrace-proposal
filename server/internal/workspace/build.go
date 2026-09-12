@@ -96,6 +96,27 @@ func (b *Builder) RunScenario(req contracts.ScenarioRequest, events []contracts.
 		res.Proposal = &p
 		end := finance.Day(b.Today).AddDate(0, 0, horizon-1)
 		res.Alternatives = finance.BuildAlternatives(in, p, end)
+
+		// The same window with the spend removed, so the owner can see the two
+		// paths together and read the cost of the decision off the difference.
+		current := in
+		current.Events = applied[:0:0]
+		for _, e := range applied {
+			if e.ID != finance.ProposalEventID {
+				current.Events = append(current.Events, e)
+			}
+		}
+		base := finance.Project(current)
+		res.WithoutProposal = &contracts.CashPath{
+			Label:           "Without this spend",
+			Days:            base.Days,
+			LowestCents:     base.LowestCents,
+			LowestDate:      base.LowestDate,
+			HeadroomCents:   base.HeadroomCents,
+			BreachesReserve: base.BreachesReserve,
+			FirstBreachDate: base.FirstBreachDate,
+		}
+		res.DeltaLowestCents = res.LowestCents - base.LowestCents
 	}
 	res.Verdict, res.Caveats = finance.Verdict(res, hasProposal)
 	res.Assumptions = b.Assumptions(res)

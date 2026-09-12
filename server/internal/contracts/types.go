@@ -248,6 +248,19 @@ type MissingInput struct {
 	WhyItMatters string `json:"whyItMatters"`
 }
 
+// CashPath is one projected cash line. The workspace shows two of them side by
+// side when a spend is proposed, so the cost of the decision is visible in
+// place rather than described.
+type CashPath struct {
+	Label           string       `json:"label"`
+	Days            []DayBalance `json:"days"`
+	LowestCents     int64        `json:"lowestCents"`
+	LowestDate      string       `json:"lowestDate"`
+	HeadroomCents   int64        `json:"headroomCents"`
+	BreachesReserve bool         `json:"breachesReserve"`
+	FirstBreachDate string       `json:"firstBreachDate,omitempty"`
+}
+
 // ScenarioResult is the deterministic engine output. The language model may
 // narrate it but never alters or recomputes any number in it.
 type ScenarioResult struct {
@@ -267,9 +280,16 @@ type ScenarioResult struct {
 	BreachesReserve bool         `json:"breachesReserve"`
 	FirstBreachDate string       `json:"firstBreachDate,omitempty"`
 
-	Proposal        *ProposedDecision `json:"proposal,omitempty"`
-	DelayBreakpoint DelayBreakpoint   `json:"delayBreakpoint"`
-	Alternatives    []Alternative     `json:"alternatives"`
+	Proposal *ProposedDecision `json:"proposal,omitempty"`
+	// WithoutProposal is the same projection with the proposed spend removed.
+	// It is present only while a proposal is active, and is what lets the
+	// timeline draw "where you are now" against "with this spend".
+	WithoutProposal *CashPath `json:"withoutProposal,omitempty"`
+	// DeltaLowestCents is proposed lowest minus current lowest: what the spend
+	// costs at the tightest moment. Negative means the trough drops.
+	DeltaLowestCents int64           `json:"deltaLowestCents"`
+	DelayBreakpoint  DelayBreakpoint `json:"delayBreakpoint"`
+	Alternatives     []Alternative   `json:"alternatives"`
 
 	AppliedEvents []FinancialEvent `json:"appliedEvents"`
 	Assumptions   []Assumption     `json:"assumptions"`
@@ -404,6 +424,12 @@ func (r *ScenarioResult) Sanitize() {
 	r.Claims = sanitizeClaims(r.Claims)
 	r.Alternatives = nonNil(r.Alternatives)
 	r.Caveats = nonNil(r.Caveats)
+	if r.WithoutProposal != nil {
+		r.WithoutProposal.Days = nonNil(r.WithoutProposal.Days)
+		for i := range r.WithoutProposal.Days {
+			r.WithoutProposal.Days[i].EventIDs = nonNil(r.WithoutProposal.Days[i].EventIDs)
+		}
+	}
 }
 
 // Sanitize fills every nil slice in the workspace payload.

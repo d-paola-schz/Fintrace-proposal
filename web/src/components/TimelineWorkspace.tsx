@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { Chain, WorkspaceResponse } from '../types/contracts'
 import { addDays, daysBetween, shortDate, usd } from '../lib/format'
 import { CARD_H, CARD_H_COMPACT, CARD_W, EventCard } from './EventCard'
+import { BAND_H, CashComparison } from './CashComparison'
 import {
   ChainNodeCard, ChainStrand, DEFAULT_METRICS, NODE_H, NODE_H_COMPACT, layoutChain,
   type ChainMetrics,
@@ -87,7 +88,11 @@ export function TimelineWorkspace({
   // the canvas scrolls rather than clipping a node.
   const GAP_FLOOR = nodeH + 8
   const FIRST_ABOVE = compact ? 26 : DEFAULT_METRICS.firstLevel
-  const FIRST_BELOW = compact ? 46 : 54
+  // While a spend is being weighed, the two cash paths occupy the band just
+  // under the rail and the chain below starts lower.
+  const comparing = !!ws.scenario.withoutProposal && !!ws.scenario.proposal
+  const bandTop = 26
+  const FIRST_BELOW = (compact ? 46 : 54) + (comparing ? bandTop + BAND_H + 14 : 0)
 
   const clampGap = (avail: number, first: number) =>
     Math.round(Math.min(122, Math.max(GAP_FLOOR, (avail - nodeH - first) / 2)))
@@ -125,7 +130,7 @@ export function TimelineWorkspace({
         return { chain, layout: layoutChain(chain, anchorX, anchorY, dir, flip, metricsFor(dir)) }
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ws.chains, ws.events, axisY, cardBandH, canvasW, gapAbove, gapBelow, nodeH],
+    [ws.chains, ws.events, axisY, cardBandH, canvasW, gapAbove, gapBelow, nodeH, comparing],
   )
 
   // Open on today, with the future — where the decisions are — in view.
@@ -135,6 +140,16 @@ export function TimelineWorkspace({
     el.scrollLeft = Math.max(0, x(ws.today) - el.clientWidth * 0.42)
     didCenter.current = true
   }, [ws.today, x])
+
+  // The moment a spend is being weighed, put the rail and the two cash paths
+  // in view. Otherwise the comparison can render below the fold on a short
+  // screen and the owner never sees the thing they asked for.
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el || !comparing) return
+    const target = Math.max(0, axisY - RAIL_H - 56)
+    el.scrollTo({ top: target, behavior: 'smooth' })
+  }, [comparing, axisY])
 
   const todayX = x(ws.today)
   const ticks = useMemo(() => {
@@ -293,6 +308,14 @@ export function TimelineWorkspace({
                 </g>
               )
             })}
+
+            {comparing && (
+              <CashComparison
+                scenario={ws.scenario}
+                x={x}
+                top={axisY + RAIL_H / 2 + bandTop}
+              />
+            )}
 
             {layouts.map(({ chain, layout }) => (
               <ChainStrand key={chain.id} layout={layout} />

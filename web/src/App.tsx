@@ -4,6 +4,7 @@ import { api } from './lib/api'
 import { TimelineWorkspace } from './components/TimelineWorkspace'
 import { NodeEvidencePanel } from './components/NodeEvidencePanel'
 import { AlternativesBar, ScenarioControls } from './components/ScenarioControls'
+import { CashComparisonHeadline } from './components/CashComparison'
 import { ToneMark } from './components/Tone'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { TONE_STYLE } from './components/Tone'
@@ -102,6 +103,9 @@ export default function App() {
   }
 
   const alertTone = ws.alert ? TONE_STYLE[ws.alert.tone] : null
+  // While a spend is on the table the comparison headline is the more precise
+  // statement of the same risk, so the generic banner stands down.
+  const comparing = !!ws.scenario.withoutProposal && !!ws.scenario.proposal
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -134,7 +138,7 @@ export default function App() {
 
       {showSources && <SourcePanel ws={ws} onClose={() => setShowSources(false)} />}
 
-      {ws.alert && alertTone && (
+      {ws.alert && alertTone && !comparing && (
         <button
           type="button"
           onClick={() => ws.alert?.focusNodeId && selectNode(ws.alert.focusNodeId)}
@@ -157,6 +161,7 @@ export default function App() {
         onChange={applyScenario}
         onReset={() => applyScenario(EMPTY)}
       />
+      <CashComparisonHeadline scenario={ws.scenario} />
       <AlternativesBar ws={ws} scenario={scenario} onChange={applyScenario} />
 
       {error && (

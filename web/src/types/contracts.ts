@@ -191,6 +191,16 @@ export interface MissingInput {
   whyItMatters: string
 }
 
+export interface CashPath {
+  label: string
+  days: DayBalance[]
+  lowestCents: number
+  lowestDate: string
+  headroomCents: number
+  breachesReserve: boolean
+  firstBreachDate?: string
+}
+
 export interface ScenarioResult {
   currency: string
   baselineBalanceCents: number
@@ -207,6 +217,8 @@ export interface ScenarioResult {
   breachesReserve: boolean
   firstBreachDate?: string
   proposal?: ProposedDecision
+  withoutProposal?: CashPath
+  deltaLowestCents: number
   delayBreakpoint: DelayBreakpoint
   alternatives: Alternative[]
   appliedEvents: FinancialEvent[]
