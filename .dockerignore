@@ -1,0 +1,6 @@
+data/raw/
+web/node_modules/
+web/dist/
+.venv/
+.git/
+*.log
