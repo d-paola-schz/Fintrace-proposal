@@ -18,7 +18,7 @@ import (
 
 // DefaultGeminiModel is a free-tier model on the Gemini developer API. Confirm
 // current free-tier eligibility for the project before a public deployment.
-const DefaultGeminiModel = "gemini-2.0-flash"
+const DefaultGeminiModel = "gemini-3.6-flash"
 
 type Gemini struct {
 	key   string
@@ -86,9 +86,16 @@ type geminiPart struct {
 }
 
 type geminiGenConfig struct {
-	Temperature      float64 `json:"temperature"`
-	MaxOutputTokens  int     `json:"maxOutputTokens"`
-	ResponseMimeType string  `json:"responseMimeType,omitempty"`
+	Temperature      float64             `json:"temperature"`
+	MaxOutputTokens  int                 `json:"maxOutputTokens"`
+	ResponseMimeType string              `json:"responseMimeType,omitempty"`
+	ThinkingConfig   *geminiThinkingConf `json:"thinkingConfig,omitempty"`
+}
+
+// geminiThinkingConf caps hidden reasoning so it cannot consume the whole
+// maxOutputTokens budget and leave no room for the visible answer.
+type geminiThinkingConf struct {
+	ThinkingLevel string `json:"thinkingLevel"`
 }
 
 func (g *Gemini) call(ctx context.Context, system, user string, jsonOut bool, maxTokens int) (string, error) {
@@ -97,7 +104,11 @@ func (g *Gemini) call(ctx context.Context, system, user string, jsonOut bool, ma
 	}
 	body := geminiReq{
 		Contents: []geminiContent{{Role: "user", Parts: []geminiPart{{Text: user}}}},
-		Config:   geminiGenConfig{Temperature: 0.1, MaxOutputTokens: maxTokens},
+		Config: geminiGenConfig{
+			Temperature:     0.1,
+			MaxOutputTokens: maxTokens,
+			ThinkingConfig:  &geminiThinkingConf{ThinkingLevel: "low"},
+		},
 	}
 	if system != "" {
 		body.System = &geminiContent{Parts: []geminiPart{{Text: system}}}
@@ -227,7 +238,7 @@ func (g *Gemini) Verify(ctx context.Context) error {
 	if g.key == "" {
 		return ErrUnavailable
 	}
-	out, err := g.call(ctx, "Reply with the single word: ok", "Reply with the single word: ok", false, 16)
+	out, err := g.call(ctx, "Reply with the single word: ok", "Reply with the single word: ok", false, 64)
 	if err != nil {
 		return err
 	}
