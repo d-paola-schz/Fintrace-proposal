@@ -1,6 +1,7 @@
 package finance
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -290,5 +291,24 @@ func TestSalesEventsNeverMoveTheBalance(t *testing.T) {
 				t.Fatalf("a non-cash sales event was applied to the projection")
 			}
 		}
+	}
+}
+
+// If the plan already breaches with the payout on time, the delay is not the
+// cause and the engine must not blame it.
+func TestDelayBreakpointReportsAnAlreadyBreachingBaseline(t *testing.T) {
+	in := baseInput(t,
+		ev("payout", "2026-09-20", 600_00, "payout"),
+		ev("spend", "2026-09-13", -700_00, "proposal"),
+	)
+	bp := FindFirstBreachingDelay(in, 10)
+	if !bp.Found || bp.DelayDays != 0 {
+		t.Fatalf("want a delay-0 breakpoint, got found=%v delay=%d", bp.Found, bp.DelayDays)
+	}
+	if bp.BreachDate != "2026-09-13" {
+		t.Fatalf("breach date = %s, want 2026-09-13", bp.BreachDate)
+	}
+	if !strings.Contains(bp.Explanation, "not what breaks this plan") {
+		t.Fatalf("explanation must say the delay is not the cause: %q", bp.Explanation)
 	}
 }

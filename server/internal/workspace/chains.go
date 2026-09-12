@@ -106,13 +106,23 @@ func (b *Builder) payoutTimingChain(res contracts.ScenarioResult, events []contr
 	}
 	if bp.Found {
 		n2.Tone = contracts.ToneRisk
-		n2.Title = fmt.Sprintf("A %d-day payout delay breaks the reserve", bp.DelayDays)
+		if bp.DelayDays == 0 {
+			n2.Title = "The reserve breaks even with the payout on time"
+		} else {
+			n2.Title = fmt.Sprintf("A %d-day payout delay breaks the reserve", bp.DelayDays)
+		}
 		n2.Summary = fmt.Sprintf("First breach %s, cash %s",
 			finance.HumanDate(bp.BreachDate), finance.FormatUSD(bp.LowestCents))
-		n2.Explanation = fmt.Sprintf(
-			"%s The payment that pushes it under is %s of %s on %s: with the payout still outstanding, that day closes below the floor. Delays shorter than %d days stay at or above it.%s",
-			bp.Explanation, rent.Label, finance.FormatUSD(-rent.AmountCents),
-			finance.HumanDate(rent.Date), bp.DelayDays, appliedDelayNote(res))
+		if bp.DelayDays == 0 {
+			n2.Explanation = bp.Explanation +
+				" Removing or moving the commitment that causes it is what changes the answer, not the payout date." +
+				appliedDelayNote(res)
+		} else {
+			n2.Explanation = fmt.Sprintf(
+				"%s The payment that pushes it under is %s of %s on %s: with the payout still outstanding, that day closes below the floor. Delays shorter than %d days stay at or above it.%s",
+				bp.Explanation, rent.Label, finance.FormatUSD(-rent.AmountCents),
+				finance.HumanDate(rent.Date), bp.DelayDays, appliedDelayNote(res))
+		}
 	} else {
 		n2.Tone = contracts.ToneReview
 		n2.Title = "No payout delay tested breaks the reserve"
@@ -356,6 +366,9 @@ func appliedDelayNote(res contracts.ScenarioResult) string {
 func delayDisplay(bp contracts.DelayBreakpoint) string {
 	if !bp.Found {
 		return fmt.Sprintf("None within %d days", bp.TestedUpToDays)
+	}
+	if bp.DelayDays == 0 {
+		return "Already below, with no delay"
 	}
 	return fmt.Sprintf("%d days", bp.DelayDays)
 }
