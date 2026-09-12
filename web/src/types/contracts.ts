@@ -146,11 +146,26 @@ export interface ProposedDecision {
   minimumReserveCents: number
 }
 
+export interface OutflowOverride {
+  amountCents?: number
+  date?: string
+  removed?: boolean
+}
+
+/** Replaces the demo's fixed figures with the owner's own. */
+export interface AssumptionOverrides {
+  outflows?: Record<string, OutflowOverride>
+  marketplaceFeePct?: number
+  brlPerUsd?: number
+  openingBalanceCents?: number
+}
+
 export interface ScenarioRequest {
   proposal?: ProposedDecision | null
   payoutDelayDays: number
   reserveCents?: number
   horizonDays?: number
+  assumptions?: AssumptionOverrides | null
 }
 
 export interface DayBalance {
@@ -191,6 +206,16 @@ export interface MissingInput {
   whyItMatters: string
 }
 
+export interface CashPath {
+  label: string
+  days: DayBalance[]
+  lowestCents: number
+  lowestDate: string
+  headroomCents: number
+  breachesReserve: boolean
+  firstBreachDate?: string
+}
+
 export interface ScenarioResult {
   currency: string
   baselineBalanceCents: number
@@ -207,6 +232,8 @@ export interface ScenarioResult {
   breachesReserve: boolean
   firstBreachDate?: string
   proposal?: ProposedDecision
+  withoutProposal?: CashPath
+  deltaLowestCents: number
   delayBreakpoint: DelayBreakpoint
   alternatives: Alternative[]
   appliedEvents: FinancialEvent[]
@@ -269,6 +296,27 @@ export interface ChatResponse {
   proposedChange?: ScenarioRequest
   proposalNote?: string
   unavailable?: string
+}
+
+export interface Discovery {
+  id: string
+  title: string
+  rationale: string
+  eventRefs: string[]
+  status: 'verified' | 'rejected'
+  rejectedBecause?: string
+  tone?: Tone
+  claims: Claim[]
+}
+
+export interface DiscoveryResponse {
+  available: boolean
+  source: 'model' | 'unavailable'
+  unavailable?: string
+  proposed: number
+  verified: number
+  discoveries: Discovery[]
+  note: string
 }
 
 export interface HealthResponse {

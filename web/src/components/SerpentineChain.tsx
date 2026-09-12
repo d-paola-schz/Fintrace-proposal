@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { Chain, ChainNode, Tone } from '../types/contracts'
 import { TONE_STYLE, ToneMark } from './Tone'
 import { STATUS_LABEL } from '../lib/format'
@@ -13,7 +13,10 @@ import { STATUS_LABEL } from '../lib/format'
 // strand meets one edge of the node and resumes at the opposite edge.
 
 export const NODE_W = 272
+/** Comfortable node height. Short viewports shrink this — see ChainMetrics. */
 export const NODE_H = 60
+/** Node height when vertical room is tight (720p projectors, 768p laptops). */
+export const NODE_H_COMPACT = 48
 const TURN = 15 // corner radius of a switchback turn
 
 export interface ChainMetrics {
@@ -23,9 +26,13 @@ export interface ChainMetrics {
   levelGap: number
   /** from the anchor to the first level line */
   firstLevel: number
+  /** height of a node box; shrinks when the workspace is short */
+  nodeH: number
 }
 
-export const DEFAULT_METRICS: ChainMetrics = { run: 376, levelGap: 84, firstLevel: 32 }
+export const DEFAULT_METRICS: ChainMetrics = {
+  run: 376, levelGap: 84, firstLevel: 32, nodeH: NODE_H,
+}
 
 export interface ChainLayout {
   levels: { y: number; nodeX: number; node: ChainNode }[]
@@ -52,61 +59,59 @@ export function layoutChain(
   flip: boolean,
   metrics: ChainMetrics = DEFAULT_METRICS,
 ): ChainLayout {
-  const { run: RUN, levelGap: LEVEL_GAP, firstLevel: FIRST_LEVEL } = metrics
+  const { run: RUN, levelGap: LEVEL_GAP, firstLevel: FIRST_LEVEL, nodeH } = metrics
   const sign = flip ? -1 : 1
-  const xA = anchorX
-  const xB = anchorX + sign * RUN
+
+  // The chain hangs centred under its root event: the runs extend half a run
+  // each side of the anchor, and every node is centred on the anchor itself.
+  // The strand drops straight down from the rail into node 01, then folds.
+  const mid = anchorX
+  const xA = anchorX - RUN / 2
+  const xB = anchorX + RUN / 2
 
   const levelY = (i: number) => anchorY + dir * (FIRST_LEVEL + i * LEVEL_GAP)
-  const mid = (xA + xB) / 2
 
   const nodes = [...chain.nodes].sort((a, b) => a.sequence - b.sequence).slice(0, 3)
   const levels = nodes.map((node, i) => ({ y: levelY(i), nodeX: mid, node }))
 
-  // Edges of the node box on a given level.
   const leftEdge = mid - NODE_W / 2
   const rightEdge = mid + NODE_W / 2
-  // Outer/inner relative to the run direction.
-  const entry = sign > 0 ? leftEdge : rightEdge
-  const exit = sign > 0 ? rightEdge : leftEdge
 
   const toneOf = (from: number, to: number): Tone =>
     chain.segments.find((s) => s.fromSequence === from && s.toSequence === to)?.tone ?? 'review'
 
   const segments: ChainLayout['segments'] = []
   const r = TURN * dir
-  const rx = TURN * sign
 
-  // Root -> node 1: drop away from the axis, turn, run inward to the node edge.
+  // Root -> node 1: a plumb drop from the rail to the top edge of the node.
   if (levels[0]) {
     const y1 = levels[0].y
     segments.push({
       key: 'seg-0-1',
       tone: toneOf(0, 1),
-      d: `M ${xA} ${anchorY} L ${xA} ${y1 - r} Q ${xA} ${y1} ${xA + rx} ${y1} L ${entry} ${y1}`,
+      d: `M ${anchorX} ${anchorY} L ${anchorX} ${y1 - dir * (nodeH / 2)}`,
     })
   }
 
-  // node i -> node i+1: leave the far edge, run to the side, tight turn, run back.
+  // node i -> node i+1: leave one edge, run out to the side, tight turn, run
+  // back to the same edge of the next node. Sides alternate, which is what
+  // makes the fold read as a switchback.
   for (let i = 0; i + 1 < levels.length; i++) {
     const yFrom = levels[i].y
     const yTo = levels[i + 1].y
-    // Odd levels run in the opposite direction, so entry/exit swap.
-    const forward = i % 2 === 0
-    const start = forward ? exit : entry
-    const end = forward ? exit : entry
-    const corner = forward ? xB : xA
-    const cornerIn = forward ? xB - rx : xA + rx
-    const cornerOut = forward ? xB - rx : xA + rx
+    const outward = i % 2 === 0 ? sign > 0 : sign < 0
+    const corner = outward ? xB : xA
+    const edge = outward ? rightEdge : leftEdge
+    const rx = outward ? TURN : -TURN
     segments.push({
       key: `seg-${i + 1}-${i + 2}`,
       tone: toneOf(i + 1, i + 2),
       d:
-        `M ${start} ${yFrom} L ${cornerIn} ${yFrom} ` +
+        `M ${edge} ${yFrom} L ${corner - rx} ${yFrom} ` +
         `Q ${corner} ${yFrom} ${corner} ${yFrom + r} ` +
         `L ${corner} ${yTo - r} ` +
-        `Q ${corner} ${yTo} ${cornerOut} ${yTo} ` +
-        `L ${end} ${yTo}`,
+        `Q ${corner} ${yTo} ${corner - rx} ${yTo} ` +
+        `L ${edge} ${yTo}`,
     })
   }
 
@@ -116,37 +121,134 @@ export function layoutChain(
     segments,
     minX: Math.min(xA, xB) - 10,
     maxX: Math.max(xA, xB) + 10,
-    minY: Math.min(anchorY, ...ys) - NODE_H / 2,
-    maxY: Math.max(anchorY, ...ys) + NODE_H / 2,
+    minY: Math.min(anchorY, ...ys) - nodeH / 2,
+    maxY: Math.max(anchorY, ...ys) + nodeH / 2,
   }
 }
 
-/** The strand itself. Two passes: a solid tone line, then white gaps that read
- *  as links without turning the chain into jewellery. */
+/**
+ * The strand, drawn as an actual chain.
+ *
+ * Links are placed along the measured path at a fixed spacing and rotated to
+ * the local tangent, so they follow the switchback round its turns. Consecutive
+ * links alternate between face-on and edge-on and are spaced closer together
+ * than they are long, which is what makes them read as interlocking rather than
+ * as beads on a string.
+ */
+
+/** Geometry of one link, in path-space pixels. */
+const LINK_LEN = 13
+const LINK_FACE_W = 8.5
+const LINK_EDGE_W = 4
+const LINK_SPACING = 8.6 // < LINK_LEN, so neighbours overlap and interlock
+const LINK_STROKE = 1.9
+
+interface Link {
+  x: number
+  y: number
+  /** tangent angle in degrees */
+  a: number
+  face: boolean
+}
+
+/** Measures a path and returns evenly spaced, tangent-aligned link positions. */
+function useLinksAlongPath(d: string): [React.RefObject<SVGPathElement | null>, Link[]] {
+  const ref = useRef<SVGPathElement | null>(null)
+  const [links, setLinks] = useState<Link[]>([])
+
+  useLayoutEffect(() => {
+    const path = ref.current
+    if (!path) return
+    let total = 0
+    try {
+      total = path.getTotalLength()
+    } catch {
+      return
+    }
+    if (!Number.isFinite(total) || total <= 0) {
+      setLinks([])
+      return
+    }
+    const out: Link[] = []
+    let i = 0
+    for (let at = LINK_SPACING / 2; at <= total; at += LINK_SPACING, i++) {
+      const p = path.getPointAtLength(at)
+      // Sample slightly ahead for the tangent; clamp at the end of the path.
+      const ahead = path.getPointAtLength(Math.min(total, at + 1))
+      const behind = path.getPointAtLength(Math.max(0, at - 1))
+      const a = (Math.atan2(ahead.y - behind.y, ahead.x - behind.x) * 180) / Math.PI
+      out.push({ x: p.x, y: p.y, a, face: i % 2 === 0 })
+    }
+    setLinks(out)
+  }, [d])
+
+  return [ref, links]
+}
+
+function ChainSegmentLinks({ d, tone }: { d: string; tone: Tone }) {
+  const [ref, links] = useLinksAlongPath(d)
+  const colour = TONE_STYLE[tone].stroke
+
+  return (
+    <g>
+      {/* Measured, never painted: the links are the visible strand. */}
+      <path ref={ref} d={d} fill="none" stroke="none" />
+      {links.map((l, i) => {
+        const w = l.face ? LINK_FACE_W : LINK_EDGE_W
+        return (
+          <g key={i} transform={`translate(${l.x} ${l.y}) rotate(${l.a})`}>
+            {/* seat the link against its neighbours */}
+            <rect
+              x={-LINK_LEN / 2}
+              y={-w / 2}
+              width={LINK_LEN}
+              height={w}
+              rx={w / 2}
+              ry={w / 2}
+              fill="none"
+              stroke="var(--color-paper)"
+              strokeWidth={LINK_STROKE + 1.6}
+            />
+            <rect
+              x={-LINK_LEN / 2}
+              y={-w / 2}
+              width={LINK_LEN}
+              height={w}
+              rx={w / 2}
+              ry={w / 2}
+              fill="none"
+              stroke={colour}
+              strokeWidth={LINK_STROKE}
+              opacity={l.face ? 0.95 : 0.8}
+            />
+            {/* a single highlight along the top of the face-on links reads as
+                a machined edge catching the light */}
+            {l.face && (
+              <rect
+                x={-LINK_LEN / 2 + 1.7}
+                y={-w / 2 + 0.8}
+                width={LINK_LEN - 3.4}
+                height={w - 1.6}
+                rx={(w - 1.6) / 2}
+                ry={(w - 1.6) / 2}
+                fill="none"
+                stroke="#ffffff"
+                strokeWidth={0.7}
+                opacity={0.42}
+              />
+            )}
+          </g>
+        )
+      })}
+    </g>
+  )
+}
+
 export function ChainStrand({ layout }: { layout: ChainLayout }) {
   return (
     <g aria-hidden>
       {layout.segments.map((s) => (
-        <g key={s.key}>
-          <path
-            d={s.d}
-            fill="none"
-            stroke={TONE_STYLE[s.tone].stroke}
-            strokeWidth={3}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            opacity={0.92}
-          />
-          <path
-            d={s.d}
-            fill="none"
-            stroke="var(--color-paper)"
-            strokeWidth={3.4}
-            strokeLinecap="butt"
-            strokeDasharray="1.1 8"
-            opacity={0.75}
-          />
-        </g>
+        <ChainSegmentLinks key={s.key} d={s.d} tone={s.tone} />
       ))}
     </g>
   )
@@ -156,15 +258,18 @@ export function ChainNodeCard({
   node,
   x,
   y,
+  h = NODE_H,
   selected,
   onSelect,
 }: {
   node: ChainNode
   x: number
   y: number
+  h?: number
   selected: boolean
   onSelect: (id: string) => void
 }) {
+  const compact = h < NODE_H
   const t = TONE_STYLE[node.tone]
   return (
     <button
@@ -176,9 +281,9 @@ export function ChainNodeCard({
       }`}
       style={{
         left: x - NODE_W / 2,
-        top: y - NODE_H / 2,
+        top: y - h / 2,
         width: NODE_W,
-        height: NODE_H,
+        height: h,
         background: t.fill,
       }}
     >
@@ -197,9 +302,13 @@ export function ChainNodeCard({
           <span className="mt-[1px] block text-[12px] font-semibold leading-[1.25] text-ink line-clamp-2">
             {node.title}
           </span>
-          <span className="mt-[1px] block truncate text-[10px] leading-tight text-muted">
-            {node.summary}
-          </span>
+          {/* The summary is the first thing to go when height is scarce; the
+              title and the tone still carry the meaning. */}
+          {!compact && (
+            <span className="mt-[1px] block truncate text-[10px] leading-tight text-muted">
+              {node.summary}
+            </span>
+          )}
         </span>
       </span>
     </button>

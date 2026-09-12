@@ -12,6 +12,7 @@ import (
 
 // Build assembles the full workspace for one scenario request.
 func (b *Builder) Build(req contracts.ScenarioRequest) contracts.WorkspaceResponse {
+	b.Overrides = req.Assumptions
 	events := b.Events()
 	res := b.RunScenario(req, events)
 
@@ -25,7 +26,7 @@ func (b *Builder) Build(req contracts.ScenarioRequest) contracts.WorkspaceRespon
 	}
 
 	chains := b.BuildChains(res, displayEvents)
-	start, end := b.WindowBounds()
+	start, end := b.WindowBounds(displayEvents)
 
 	return contracts.WorkspaceResponse{
 		Business:        b.profile(),
@@ -49,6 +50,7 @@ func (b *Builder) Build(req contracts.ScenarioRequest) contracts.WorkspaceRespon
 // RunScenario applies the request to the engine. This is the only path by which
 // any number in the product is produced.
 func (b *Builder) RunScenario(req contracts.ScenarioRequest, events []contracts.FinancialEvent) contracts.ScenarioResult {
+	b.Overrides = req.Assumptions
 	reserve := b.Store.Assume.Reserve.AmountCents
 	if req.ReserveCents > 0 {
 		reserve = req.ReserveCents
@@ -73,8 +75,9 @@ func (b *Builder) RunScenario(req contracts.ScenarioRequest, events []contracts.
 		applied = finance.ShiftPayouts(applied, req.PayoutDelayDays)
 	}
 
+	balance, _ := b.balanceCents()
 	in := finance.Input{
-		BaselineCents:  b.Nessie.BalanceCents,
+		BaselineCents:  balance,
 		BaselineAsOf:   b.Nessie.AsOf,
 		BaselineSource: b.baselineSource(),
 		Currency:       "USD",
@@ -96,6 +99,27 @@ func (b *Builder) RunScenario(req contracts.ScenarioRequest, events []contracts.
 		res.Proposal = &p
 		end := finance.Day(b.Today).AddDate(0, 0, horizon-1)
 		res.Alternatives = finance.BuildAlternatives(in, p, end)
+
+		// The same window with the spend removed, so the owner can see the two
+		// paths together and read the cost of the decision off the difference.
+		current := in
+		current.Events = applied[:0:0]
+		for _, e := range applied {
+			if e.ID != finance.ProposalEventID {
+				current.Events = append(current.Events, e)
+			}
+		}
+		base := finance.Project(current)
+		res.WithoutProposal = &contracts.CashPath{
+			Label:           "Without this spend",
+			Days:            base.Days,
+			LowestCents:     base.LowestCents,
+			LowestDate:      base.LowestDate,
+			HeadroomCents:   base.HeadroomCents,
+			BreachesReserve: base.BreachesReserve,
+			FirstBreachDate: base.FirstBreachDate,
+		}
+		res.DeltaLowestCents = res.LowestCents - base.LowestCents
 	}
 	res.Verdict, res.Caveats = finance.Verdict(res, hasProposal)
 	res.Assumptions = b.Assumptions(res)
@@ -105,6 +129,9 @@ func (b *Builder) RunScenario(req contracts.ScenarioRequest, events []contracts.
 }
 
 func (b *Builder) baselineSource() string {
+	if _, prov := b.balanceCents(); prov == contracts.ProvUserEntered {
+		return "The opening balance you entered"
+	}
 	if b.Nessie.Source == "live" {
 		return "Nessie sandbox account (live read)"
 	}
@@ -160,6 +187,10 @@ func (b *Builder) resultClaims(res contracts.ScenarioResult) []contracts.Claim {
 		},
 	}
 }
+
+// secondOf lets an accessor that returns (value, provenance) be used where only
+// the provenance is wanted.
+func secondOf[T any](_ T, prov string) string { return prov }
 
 func provenanceOfBaseline(n *data.NessieSnapshot) string {
 	if n.Source == "live" {

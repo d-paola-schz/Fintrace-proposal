@@ -1,5 +1,6 @@
 import type {
-  ChatRequest, ChatResponse, ScenarioRequest, SourceRecord, WorkspaceResponse,
+  ChatRequest, ChatResponse, DiscoveryResponse, ScenarioRequest, SourceRecord,
+  WorkspaceResponse,
 } from '../types/contracts'
 
 const TIMEOUT_MS = 20_000
@@ -33,4 +34,6 @@ export const api = {
   chat: (req: ChatRequest) =>
     request<ChatResponse>('/api/chat', { method: 'POST', body: JSON.stringify(req) }),
   source: (id: string) => request<SourceRecord>(`/api/sources/${encodeURIComponent(id)}`),
+  discover: (req: ScenarioRequest) =>
+    request<DiscoveryResponse>('/api/discover', { method: 'POST', body: JSON.stringify(req) }),
 }

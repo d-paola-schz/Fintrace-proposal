@@ -91,6 +91,7 @@ func (s *Server) handleWorkspace(w http.ResponseWriter, r *http.Request) {
 	b := s.builder(r.Context())
 	resp := b.Build(contracts.ScenarioRequest{})
 	resp.SourceStatus = s.sourceStatus()
+	resp.Sanitize()
 	writeJSON(w, http.StatusOK, resp)
 }
 
@@ -104,6 +105,9 @@ func validateScenario(req *contracts.ScenarioRequest, today time.Time) error {
 	}
 	if req.HorizonDays < 0 || req.HorizonDays > finance.MaxHorizonDays {
 		return fmt.Errorf("horizonDays must be between 0 and %d", finance.MaxHorizonDays)
+	}
+	if err := validateOverrides(req.Assumptions, today); err != nil {
+		return err
 	}
 	if req.Proposal == nil {
 		return nil
@@ -124,6 +128,9 @@ func validateScenario(req *contracts.ScenarioRequest, today time.Time) error {
 			return fmt.Errorf("proposal date is beyond the %d-day horizon", finance.MaxHorizonDays)
 		}
 	}
+	if err := validateOverrides(req.Assumptions, today); err != nil {
+		return err
+	}
 	switch p.Category {
 	case "", "marketing", "inventory", "equipment", "other":
 	default:
@@ -131,6 +138,54 @@ func validateScenario(req *contracts.ScenarioRequest, today time.Time) error {
 	}
 	if len(p.Description) > 120 {
 		p.Description = p.Description[:120]
+	}
+	return nil
+}
+
+// validateOverrides bounds every owner-supplied figure before it can reach the
+// engine. An unbounded rate or a date outside the window would produce a
+// projection that is arithmetically fine and completely meaningless.
+func validateOverrides(a *contracts.AssumptionOverrides, today time.Time) error {
+	if a == nil {
+		return nil
+	}
+	if a.MarketplaceFeePct != nil {
+		if *a.MarketplaceFeePct < 0 || *a.MarketplaceFeePct > 90 {
+			return fmt.Errorf("marketplaceFeePct must be between 0 and 90")
+		}
+	}
+	if a.BRLPerUSD != nil {
+		if *a.BRLPerUSD < 0.1 || *a.BRLPerUSD > 100 {
+			return fmt.Errorf("brlPerUsd must be between 0.1 and 100")
+		}
+	}
+	if a.OpeningBalanceCents != nil {
+		if *a.OpeningBalanceCents < 0 || *a.OpeningBalanceCents > 1_000_000_000 {
+			return fmt.Errorf("openingBalanceCents must be between 0 and 1000000000")
+		}
+	}
+	if len(a.Outflows) > 12 {
+		return fmt.Errorf("too many outflow overrides")
+	}
+	for id, o := range a.Outflows {
+		if !strings.HasPrefix(id, "asm-") || len(id) > 40 {
+			return fmt.Errorf("unknown assumption id %q", id)
+		}
+		if o.AmountCents != nil && (*o.AmountCents > 0 || *o.AmountCents < -100_000_000) {
+			return fmt.Errorf("%s amountCents must be a negative amount no larger than 100000000", id)
+		}
+		if o.Date != nil {
+			d, err := finance.ParseDate(*o.Date)
+			if err != nil {
+				return fmt.Errorf("%s date: %w", id, err)
+			}
+			if d.Before(finance.Day(today).AddDate(0, 0, -1)) {
+				return fmt.Errorf("%s cannot be dated in the past", id)
+			}
+			if d.After(finance.Day(today).AddDate(0, 0, finance.MaxHorizonDays)) {
+				return fmt.Errorf("%s is beyond the %d-day horizon", id, finance.MaxHorizonDays)
+			}
+		}
 	}
 	return nil
 }
@@ -148,6 +203,7 @@ func (s *Server) handleScenario(w http.ResponseWriter, r *http.Request) {
 	}
 	resp := b.Build(req)
 	resp.SourceStatus = s.sourceStatus()
+	resp.Sanitize()
 	writeJSON(w, http.StatusOK, resp)
 }
 
@@ -161,6 +217,62 @@ func (s *Server) handleSource(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeErr(w, http.StatusNotFound, "no source record with that id")
+}
+
+// handleDiscover runs one model pass over the timeline and returns what
+// survived checking. The model chooses which events belong together and says
+// why; the engine decides whether that is true, attaches every figure, and sets
+// the severity. Candidates that fail are returned as rejected, with the reason,
+// rather than hidden.
+func (s *Server) handleDiscover(w http.ResponseWriter, r *http.Request) {
+	var req contracts.ScenarioRequest
+	if err := decodeBody(w, r, &req); err != nil {
+		writeErr(w, http.StatusBadRequest, "could not read the request body")
+		return
+	}
+	b := s.builder(r.Context())
+	if err := validateScenario(&req, b.Today); err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	ws := b.Build(req)
+	ws.Sanitize()
+
+	resp := contracts.DiscoveryResponse{
+		Note: "The model chose which events to put together and why, in words. Every figure below, and the severity, came from the engine afterwards. Anything the model referred to that does not exist was rejected and is shown as rejected.",
+	}
+
+	if !s.ai.Available() {
+		resp.Source = "unavailable"
+		resp.Unavailable = s.ai.Status().Detail
+		resp.Sanitize()
+		writeJSON(w, http.StatusOK, resp)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
+	defer cancel()
+
+	candidates, err := s.ai.Discover(ctx, b.BuildBrief(ws))
+	if err != nil {
+		resp.Source = "unavailable"
+		resp.Unavailable = s.ai.Status().Detail
+		resp.Sanitize()
+		writeJSON(w, http.StatusOK, resp)
+		return
+	}
+
+	resp.Available = true
+	resp.Source = "model"
+	resp.Proposed = len(candidates)
+	resp.Discoveries = b.Verify(candidates, ws)
+	for _, d := range resp.Discoveries {
+		if d.Status == "verified" {
+			resp.Verified++
+		}
+	}
+	resp.Sanitize()
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
@@ -188,7 +300,10 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	ws := b.Build(scenario)
-	writeJSON(w, http.StatusOK, s.answer(r.Context(), b, ws, req))
+	ws.Sanitize()
+	answer := s.answer(r.Context(), b, ws, req)
+	answer.Sanitize()
+	writeJSON(w, http.StatusOK, answer)
 }
 
 // answer routes the question, gathers the engine's own facts, and asks the

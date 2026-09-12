@@ -195,6 +195,40 @@ type ProposedDecision struct {
 	MinimumReserveCents int64  `json:"minimumReserveCents"`
 }
 
+// OutflowOverride replaces one modeled payment with the owner's own figure.
+type OutflowOverride struct {
+	AmountCents *int64  `json:"amountCents,omitempty"`
+	Date        *string `json:"date,omitempty"`
+	// Removed drops the payment entirely: it may simply not apply to them.
+	Removed bool `json:"removed,omitempty"`
+}
+
+// AssumptionOverrides turns the demo's fixed figures into the owner's inputs.
+//
+// Everything here shipped as a constant in data/demo-assumptions.json. Any
+// value the owner supplies replaces it and, just as importantly, changes that
+// figure's provenance from "demo assumption" to "you entered", so the source
+// badges stay truthful as the scenario becomes theirs.
+type AssumptionOverrides struct {
+	// Outflows is keyed by assumption id: asm-supplier, asm-ads, asm-rent.
+	Outflows map[string]OutflowOverride `json:"outflows,omitempty"`
+	// MarketplaceFeePct replaces the modeled commission.
+	MarketplaceFeePct *float64 `json:"marketplaceFeePct,omitempty"`
+	// BRLPerUSD replaces the demo conversion rate.
+	BRLPerUSD *float64 `json:"brlPerUsd,omitempty"`
+	// OpeningBalanceCents replaces the starting cash position.
+	OpeningBalanceCents *int64 `json:"openingBalanceCents,omitempty"`
+}
+
+// Any reports whether the owner has changed anything at all.
+func (a *AssumptionOverrides) Any() bool {
+	if a == nil {
+		return false
+	}
+	return len(a.Outflows) > 0 || a.MarketplaceFeePct != nil ||
+		a.BRLPerUSD != nil || a.OpeningBalanceCents != nil
+}
+
 // ScenarioRequest is the validated input to the deterministic engine.
 type ScenarioRequest struct {
 	Proposal        *ProposedDecision `json:"proposal,omitempty"`
@@ -203,6 +237,8 @@ type ScenarioRequest struct {
 	ReserveCents int64 `json:"reserveCents,omitempty"`
 	// HorizonDays defaults to 30.
 	HorizonDays int `json:"horizonDays,omitempty"`
+	// Assumptions replaces the demo's fixed figures with the owner's own.
+	Assumptions *AssumptionOverrides `json:"assumptions,omitempty"`
 }
 
 // DayBalance is one row of the daily projection.
@@ -248,6 +284,19 @@ type MissingInput struct {
 	WhyItMatters string `json:"whyItMatters"`
 }
 
+// CashPath is one projected cash line. The workspace shows two of them side by
+// side when a spend is proposed, so the cost of the decision is visible in
+// place rather than described.
+type CashPath struct {
+	Label           string       `json:"label"`
+	Days            []DayBalance `json:"days"`
+	LowestCents     int64        `json:"lowestCents"`
+	LowestDate      string       `json:"lowestDate"`
+	HeadroomCents   int64        `json:"headroomCents"`
+	BreachesReserve bool         `json:"breachesReserve"`
+	FirstBreachDate string       `json:"firstBreachDate,omitempty"`
+}
+
 // ScenarioResult is the deterministic engine output. The language model may
 // narrate it but never alters or recomputes any number in it.
 type ScenarioResult struct {
@@ -267,9 +316,16 @@ type ScenarioResult struct {
 	BreachesReserve bool         `json:"breachesReserve"`
 	FirstBreachDate string       `json:"firstBreachDate,omitempty"`
 
-	Proposal        *ProposedDecision `json:"proposal,omitempty"`
-	DelayBreakpoint DelayBreakpoint   `json:"delayBreakpoint"`
-	Alternatives    []Alternative     `json:"alternatives"`
+	Proposal *ProposedDecision `json:"proposal,omitempty"`
+	// WithoutProposal is the same projection with the proposed spend removed.
+	// It is present only while a proposal is active, and is what lets the
+	// timeline draw "where you are now" against "with this spend".
+	WithoutProposal *CashPath `json:"withoutProposal,omitempty"`
+	// DeltaLowestCents is proposed lowest minus current lowest: what the spend
+	// costs at the tightest moment. Negative means the trough drops.
+	DeltaLowestCents int64           `json:"deltaLowestCents"`
+	DelayBreakpoint  DelayBreakpoint `json:"delayBreakpoint"`
+	Alternatives     []Alternative   `json:"alternatives"`
 
 	AppliedEvents []FinancialEvent `json:"appliedEvents"`
 	Assumptions   []Assumption     `json:"assumptions"`
@@ -340,6 +396,49 @@ type ChatResponse struct {
 	Unavailable    string           `json:"unavailable,omitempty"`
 }
 
+// Discovery is one thing the language model proposed looking at, after the Go
+// engine has checked it.
+//
+// The division is deliberate and is the whole point: the model may only say
+// WHICH of the events already on the timeline deserve attention and WHY, in
+// words. It may not state a figure, invent an event, or decide severity. Every
+// number attached here is computed by the engine afterwards, and anything the
+// model referenced that does not exist causes the candidate to be rejected and
+// reported as rejected rather than quietly dropped.
+type Discovery struct {
+	ID        string `json:"id"`
+	Title     string `json:"title"`
+	Rationale string `json:"rationale"`
+	// EventRefs are timeline event IDs. Every one is checked to exist.
+	EventRefs []string `json:"eventRefs"`
+	Status    string   `json:"status"` // verified | rejected
+	// RejectedBecause is shown to the user. A silent drop would hide the fact
+	// that the model produced something unusable.
+	RejectedBecause string  `json:"rejectedBecause,omitempty"`
+	Tone            string  `json:"tone,omitempty"`
+	Claims          []Claim `json:"claims"`
+}
+
+// DiscoveryResponse is the result of one model pass over the timeline.
+type DiscoveryResponse struct {
+	Available   bool        `json:"available"`
+	Source      string      `json:"source"` // model | unavailable
+	Unavailable string      `json:"unavailable,omitempty"`
+	Proposed    int         `json:"proposed"`
+	Verified    int         `json:"verified"`
+	Discoveries []Discovery `json:"discoveries"`
+	Note        string      `json:"note"`
+}
+
+// Sanitize fills every nil slice in a discovery reply.
+func (d *DiscoveryResponse) Sanitize() {
+	d.Discoveries = nonNil(d.Discoveries)
+	for i := range d.Discoveries {
+		d.Discoveries[i].EventRefs = nonNil(d.Discoveries[i].EventRefs)
+		d.Discoveries[i].Claims = sanitizeClaims(d.Discoveries[i].Claims)
+	}
+}
+
 // HealthResponse reports readiness without exposing secrets.
 type HealthResponse struct {
 	Status      string         `json:"status"`
@@ -348,4 +447,100 @@ type HealthResponse struct {
 	UptimeSecs  int64          `json:"uptimeSeconds"`
 	Sources     []SourceStatus `json:"sources"`
 	DataVersion string         `json:"dataVersion"`
+}
+
+// --- JSON slice discipline ----------------------------------------------
+//
+// Go marshals a nil slice as `null`, not `[]`. The client reads these fields
+// with `.length`, so a single nil slice anywhere in this payload takes down the
+// whole React tree. Every response is passed through Sanitize before it is
+// written, so the contract can promise: a field typed as an array is always an
+// array.
+
+func nonNil[T any](s []T) []T {
+	if s == nil {
+		return []T{}
+	}
+	return s
+}
+
+func sanitizeClaims(cs []Claim) []Claim {
+	cs = nonNil(cs)
+	for i := range cs {
+		cs[i].SourceRefs = nonNil(cs[i].SourceRefs)
+	}
+	return cs
+}
+
+func sanitizeChart(c *ChartSpec) *ChartSpec {
+	if c == nil {
+		return nil
+	}
+	c.Points = nonNil(c.Points)
+	c.SourceRefs = nonNil(c.SourceRefs)
+	return c
+}
+
+func sanitizeEvents(es []FinancialEvent) []FinancialEvent {
+	es = nonNil(es)
+	for i := range es {
+		es[i].SourceRefs = nonNil(es[i].SourceRefs)
+		es[i].Claims = sanitizeClaims(es[i].Claims)
+	}
+	return es
+}
+
+// Sanitize fills every nil slice in the result so the client never sees null
+// where it expects an array.
+func (r *ScenarioResult) Sanitize() {
+	r.Days = nonNil(r.Days)
+	for i := range r.Days {
+		r.Days[i].EventIDs = nonNil(r.Days[i].EventIDs)
+	}
+	r.AppliedEvents = sanitizeEvents(r.AppliedEvents)
+	r.Assumptions = nonNil(r.Assumptions)
+	r.MissingInputs = nonNil(r.MissingInputs)
+	r.Claims = sanitizeClaims(r.Claims)
+	r.Alternatives = nonNil(r.Alternatives)
+	r.Caveats = nonNil(r.Caveats)
+	if r.WithoutProposal != nil {
+		r.WithoutProposal.Days = nonNil(r.WithoutProposal.Days)
+		for i := range r.WithoutProposal.Days {
+			r.WithoutProposal.Days[i].EventIDs = nonNil(r.WithoutProposal.Days[i].EventIDs)
+		}
+	}
+}
+
+// Sanitize fills every nil slice in the workspace payload.
+func (w *WorkspaceResponse) Sanitize() {
+	w.Events = sanitizeEvents(w.Events)
+	w.Assumptions = nonNil(w.Assumptions)
+	w.Sources = nonNil(w.Sources)
+	w.SourceStatus = nonNil(w.SourceStatus)
+	w.Chains = nonNil(w.Chains)
+	for i := range w.Chains {
+		c := &w.Chains[i]
+		c.Segments = nonNil(c.Segments)
+		c.Nodes = nonNil(c.Nodes)
+		for j := range c.Nodes {
+			n := &c.Nodes[j]
+			n.Claims = sanitizeClaims(n.Claims)
+			n.SourceRefs = nonNil(n.SourceRefs)
+			n.AssumptionRefs = nonNil(n.AssumptionRefs)
+			n.ResponseOptions = nonNil(n.ResponseOptions)
+			n.SuggestedAsks = nonNil(n.SuggestedAsks)
+			n.Chart = sanitizeChart(n.Chart)
+		}
+	}
+	if w.Alert != nil {
+		w.Alert.EventIDs = nonNil(w.Alert.EventIDs)
+	}
+	w.Scenario.Sanitize()
+}
+
+// Sanitize fills every nil slice in a chat reply.
+func (c *ChatResponse) Sanitize() {
+	c.SourceRefs = nonNil(c.SourceRefs)
+	c.Claims = sanitizeClaims(c.Claims)
+	c.MissingInputs = nonNil(c.MissingInputs)
 }

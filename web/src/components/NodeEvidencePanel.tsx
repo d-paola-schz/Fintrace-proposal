@@ -6,6 +6,9 @@ import { ClaimRow, SourceLink } from './ClaimRow'
 import { ContextChart } from './ContextChart'
 import { Chat } from './Chat'
 import { ProvenanceChip, TONE_STYLE, ToneMark } from './Tone'
+import { Section } from './Section'
+import { Discoveries } from './Discoveries'
+import { AssumptionEditor, assumptionSummary } from './AssumptionEditor'
 
 /** The contextual panel. Selection, title, chart, evidence and chat always
  *  describe the same node — never two different things at once. */
@@ -75,14 +78,6 @@ function PanelShell({
   )
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <h3 className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.09em] text-muted">
-      {children}
-    </h3>
-  )
-}
-
 function NodePanel({
   ws, node, scenario, onApplyScenario, onSelectNode, onClose,
 }: {
@@ -95,7 +90,9 @@ function NodePanel({
 }) {
   const chain = ws.chains.find((c) => c.id === node.chainId)
   const t = TONE_STYLE[node.tone]
-  const assumptions = ws.assumptions.filter((a) => node.assumptionRefs.includes(a.id))
+  const assumptions = (ws.assumptions ?? []).filter((a) =>
+    (node.assumptionRefs ?? []).includes(a.id),
+  )
 
   return (
     <PanelShell
@@ -113,7 +110,7 @@ function NodePanel({
           </span>
           {chain && (
             <span className="tnum text-[10.5px] text-muted">
-              {chain.title} · {node.sequence} of {chain.nodes.length}
+              {chain.title} · {node.sequence} of {(chain.nodes ?? []).length}
             </span>
           )}
         </div>
@@ -123,7 +120,7 @@ function NodePanel({
       {/* step through the chain without losing your place */}
       {chain && (
         <div className="mb-3 flex gap-1">
-          {chain.nodes.map((n) => (
+          {(chain.nodes ?? []).map((n) => (
             <button
               key={n.id}
               type="button"
@@ -145,7 +142,8 @@ function NodePanel({
         </div>
       )}
 
-      <p className="text-[13px] leading-relaxed text-[#22303f]">{node.explanation}</p>
+      {/* the conclusion leads, and reads as prose rather than as a field */}
+      <p className="text-[13.5px] leading-relaxed text-[#1b2635]">{node.explanation}</p>
 
       {node.chart && (
         <div className="mt-3">
@@ -153,20 +151,51 @@ function NodePanel({
         </div>
       )}
 
-      {node.claims.length > 0 && (
-        <section className="mt-4">
-          <SectionTitle>Evidence</SectionTitle>
+      {(node.claims ?? []).length > 0 && (
+        <Section title="The figures behind it" count={(node.claims ?? []).length}>
           <ul className="rounded-lg border border-hair bg-white px-3">
-            {node.claims.map((c) => (
+            {(node.claims ?? []).map((c) => (
               <ClaimRow key={c.id} claim={c} />
             ))}
           </ul>
-        </section>
+        </Section>
+      )}
+
+      {(node.responseOptions ?? []).length > 0 && (
+        <Section title="What you could do" tone="action">
+          <ul className="space-y-1.5">
+            {(node.responseOptions ?? []).map((o) => (
+              <li key={o.id} className="rounded-lg border border-[#d9caec] bg-[#f9f6fd] p-2.5">
+                <p className="text-[12.5px] font-semibold text-ink">{o.label}</p>
+                <p className="mt-0.5 text-[10.5px] leading-snug text-muted">{o.detail}</p>
+                {o.action === 'adjust_payout_delay' && o.value && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onApplyScenario({ ...scenario, payoutDelayDays: Number(o.value) })
+                    }
+                    className="mt-1.5 rounded bg-[#54397e] px-2.5 py-1 text-[11px] font-medium text-white"
+                  >
+                    Apply a {o.value}-day delay
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1.5 text-[10px] italic leading-snug text-muted">
+            Proposals only. Preflight never contacts a supplier, moves money, or changes anything
+            outside this screen.
+          </p>
+        </Section>
       )}
 
       {assumptions.length > 0 && (
-        <section className="mt-4">
-          <SectionTitle>Assumptions behind this</SectionTitle>
+        <Section
+          title="Assumptions behind this"
+          count={assumptions.length}
+          collapsible
+          defaultOpen={false}
+        >
           <ul className="space-y-1.5">
             {assumptions.map((a) => (
               <li key={a.id} className="rounded-lg border border-hair bg-white p-2.5">
@@ -184,40 +213,27 @@ function NodePanel({
               </li>
             ))}
           </ul>
-        </section>
+        </Section>
       )}
 
-      {node.responseOptions.length > 0 && (
-        <section className="mt-4">
-          <SectionTitle>What you could do</SectionTitle>
-          <ul className="space-y-1.5">
-            {node.responseOptions.map((o) => (
-              <li key={o.id} className="rounded-lg border border-hair bg-white p-2.5">
-                <p className="text-[12px] font-semibold text-ink">{o.label}</p>
-                <p className="mt-0.5 text-[10.5px] leading-snug text-muted">{o.detail}</p>
-                {o.action === 'adjust_payout_delay' && o.value && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onApplyScenario({ ...scenario, payoutDelayDays: Number(o.value) })
-                    }
-                    className="mt-1.5 rounded bg-[#1b2b4b] px-2.5 py-1 text-[11px] font-medium text-white"
-                  >
-                    Apply a {o.value}-day delay
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-          <p className="mt-1.5 text-[10px] italic leading-snug text-muted">
-            These are proposals. Preflight never contacts a supplier, moves money, or changes
-            anything outside this screen.
-          </p>
-        </section>
-      )}
+      <Section
+        title="Where this came from"
+        count={(node.sourceRefs ?? []).length}
+        collapsible
+        defaultOpen={false}
+      >
+        <div className="flex flex-wrap items-start gap-1.5">
+          {(node.sourceRefs ?? []).map((r) => (
+            <SourceLink key={r} id={r} />
+          ))}
+        </div>
+        <p className="mt-1.5 text-[10px] text-muted">
+          Generated by rule <span className="font-mono">{node.ruleId}</span>, not by a language
+          model.
+        </p>
+      </Section>
 
-      <section className="mt-4 border-t border-hair pt-3">
-        <SectionTitle>Ask about this node</SectionTitle>
+      <Section title="Ask about this node" tone="action">
         <Chat
           nodeId={node.id}
           scenario={scenario}
@@ -226,20 +242,7 @@ function NodePanel({
           onApplyScenario={onApplyScenario}
           compact
         />
-      </section>
-
-      <p className="mt-3 text-[10px] text-muted">
-        Rule <span className="font-mono">{node.ruleId}</span> · sources{' '}
-        {node.sourceRefs.length > 0 ? (
-          <span className="inline-flex flex-wrap gap-1 align-middle">
-            {node.sourceRefs.slice(0, 4).map((r) => (
-              <SourceLink key={r} id={r} />
-            ))}
-          </span>
-        ) : (
-          'none'
-        )}
-      </p>
+      </Section>
     </PanelShell>
   )
 }
@@ -275,25 +278,28 @@ function EventPanel({ event, onClose }: { event: FinancialEvent; onClose: () => 
         <p className="mt-3 text-[12.5px] leading-relaxed text-[#22303f]">{event.detail}</p>
       )}
 
-      {event.claims && event.claims.length > 0 && (
-        <section className="mt-4">
-          <SectionTitle>Evidence</SectionTitle>
+      {(event.claims ?? []).length > 0 && (
+        <Section title="The figures behind it" count={(event.claims ?? []).length}>
           <ul className="rounded-lg border border-hair bg-white px-3">
-            {event.claims.map((c) => (
+            {(event.claims ?? []).map((c) => (
               <ClaimRow key={c.id} claim={c} />
             ))}
           </ul>
-        </section>
+        </Section>
       )}
 
-      <section className="mt-4">
-        <SectionTitle>Sources</SectionTitle>
-        <div className="flex flex-wrap gap-1.5">
-          {event.sourceRefs.map((r) => (
+      <Section
+        title="Where this came from"
+        count={(event.sourceRefs ?? []).length}
+        collapsible
+        defaultOpen={false}
+      >
+        <div className="flex flex-wrap items-start gap-1.5">
+          {(event.sourceRefs ?? []).map((r) => (
             <SourceLink key={r} id={r} />
           ))}
         </div>
-      </section>
+      </Section>
     </PanelShell>
   )
 }
@@ -320,29 +326,31 @@ function OverviewPanel({
     >
       <p className="text-[13px] leading-relaxed text-[#22303f]">{s.verdict}</p>
 
-      <section className="mt-3">
-        <SectionTitle>The numbers</SectionTitle>
+      <Section title="The numbers" count={(s.claims ?? []).length}>
         <ul className="rounded-lg border border-hair bg-white px-3">
-          {s.claims.map((c) => (
+          {(s.claims ?? []).map((c) => (
             <ClaimRow key={c.id} claim={c} />
           ))}
         </ul>
-      </section>
+      </Section>
 
-      <section className="mt-4">
-        <SectionTitle>What this cannot tell you</SectionTitle>
+      <Section title="What this cannot tell you" count={(s.missingInputs ?? []).length}>
         <ul className="space-y-1.5">
-          {s.missingInputs.map((m) => (
-            <li key={m.field} className="rounded-lg border border-hair bg-white p-2.5">
-              <p className="text-[11.5px] font-semibold text-ink">{m.question}</p>
-              <p className="mt-0.5 text-[10.5px] leading-snug text-muted">{m.whyItMatters}</p>
+          {(s.missingInputs ?? []).map((m) => (
+            <li key={m.field} className="rounded-lg border border-[#e3d19a] bg-[#fdf8e9] p-2.5">
+              <p className="text-[11.5px] font-semibold text-[#7d5e0d]">{m.question}</p>
+              <p className="mt-0.5 text-[10.5px] leading-snug text-[#7d5e0d]/85">{m.whyItMatters}</p>
             </li>
           ))}
         </ul>
-      </section>
+      </Section>
 
-      <section className="mt-4">
-        <SectionTitle>Business</SectionTitle>
+      <Section title="Your figures" collapsible defaultOpen={false}>
+        <p className="mb-1.5 text-[10.5px] text-muted">{assumptionSummary(ws)}</p>
+        <AssumptionEditor ws={ws} scenario={scenario} onChange={onApplyScenario} />
+      </Section>
+
+      <Section title="The business" collapsible defaultOpen={false}>
         <div className="rounded-lg border border-hair bg-white p-2.5">
           <p className="text-[11.5px] text-[#3d4757]">{ws.business.category}</p>
           <p className="tnum mt-1 text-[10.5px] text-muted">{ws.business.sourceWindow}</p>
@@ -353,10 +361,13 @@ function OverviewPanel({
             <SourceLink id="src-olist-seller" />
           </div>
         </div>
-      </section>
+      </Section>
 
-      <section className="mt-4 border-t border-hair pt-3">
-        <SectionTitle>Ask about the business</SectionTitle>
+      <Section title="Ask the model what to look at" tone="action">
+        <Discoveries scenario={scenario} />
+      </Section>
+
+      <Section title="Ask about the business" tone="action">
         <Chat
           scenario={scenario}
           placeholder="Ask anything about your cash…"
@@ -367,7 +378,7 @@ function OverviewPanel({
           ]}
           onApplyScenario={onApplyScenario}
         />
-      </section>
+      </Section>
 
       <p className="mt-3 text-[10px] leading-snug text-muted">
         Window {shortDate(s.startDate)} – {shortDate(s.endDate)} · {ws.displayCurrency} ·{' '}

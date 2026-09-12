@@ -258,7 +258,8 @@ func (b *Builder) salesStockChain() contracts.Chain {
 				Note:       "Both windows are 30 days and both count only this seller's items.",
 			},
 		},
-		Chart: b.salesChart(),
+		Chart:           b.salesChart(),
+		ResponseOptions: []contracts.ResponseOption{},
 		SuggestedAsks: []string{
 			"Is this growth or just price?",
 			"Which categories moved?",
@@ -304,7 +305,8 @@ func (b *Builder) salesStockChain() contracts.Chain {
 				Note:       "Average recorded item price. This is the price the customer paid, not what the product cost you — Olist publishes no cost of goods.",
 			},
 		},
-		SuggestedAsks: []string{"What else sells alongside it?"},
+		ResponseOptions: []contracts.ResponseOption{},
+		SuggestedAsks:   []string{"What else sells alongside it?"},
 	}
 
 	n3 := contracts.ChainNode{

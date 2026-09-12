@@ -1,6 +1,8 @@
 package workspace
 
 import (
+	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -343,5 +345,256 @@ func TestFixtureBaselineIsLabelledHonestly(t *testing.T) {
 		if c.ID == "claim-res-baseline" && c.Provenance != contracts.ProvDemoAssumption {
 			t.Errorf("an unfetched baseline must not claim nessie_sandbox provenance")
 		}
+	}
+}
+
+// Go marshals a nil slice as `null`. The client reads these fields with
+// `.length`, so one nil slice white-screens the entire page and the user has to
+// reload. This asserts the payload never contains null where an array belongs.
+func TestPayloadNeverContainsNullWhereAnArrayIsExpected(t *testing.T) {
+	b := testBuilder(t)
+
+	for _, req := range []contracts.ScenarioRequest{
+		{},
+		{PayoutDelayDays: 14},
+		{Proposal: &contracts.ProposedDecision{
+			Description: "Ads", Category: "marketing",
+			Date: b.Today.AddDate(0, 0, 4).Format(finance.DateLayout), AmountCents: 300_00,
+		}},
+	} {
+		ws := b.Build(req)
+		ws.Sanitize()
+
+		raw, err := json.Marshal(ws)
+		if err != nil {
+			t.Fatalf("marshal: %v", err)
+		}
+		var tree any
+		if err := json.Unmarshal(raw, &tree); err != nil {
+			t.Fatalf("unmarshal: %v", err)
+		}
+		// These keys are read with .length on the client.
+		arrayKeys := map[string]bool{
+			"events": true, "chains": true, "nodes": true, "segments": true,
+			"claims": true, "sourceRefs": true, "assumptionRefs": true,
+			"responseOptions": true, "suggestedAsks": true, "assumptions": true,
+			"sources": true, "sourceStatus": true, "missingInputs": true,
+			"alternatives": true, "caveats": true, "days": true, "eventIds": true,
+			"appliedEvents": true, "points": true,
+		}
+		var walk func(node any, path string)
+		walk = func(node any, path string) {
+			switch v := node.(type) {
+			case map[string]any:
+				for k, child := range v {
+					p := path + "." + k
+					if child == nil && arrayKeys[k] {
+						t.Errorf("%s is null; the client calls .length on it", p)
+					}
+					walk(child, p)
+				}
+			case []any:
+				for i, child := range v {
+					walk(child, fmt.Sprintf("%s[%d]", path, i))
+				}
+			}
+		}
+		walk(tree, "workspace")
+	}
+}
+
+// The timeline must always reach whatever the scenario produces. Dragging the
+// payout to the end of the delay range used to push it past a fixed window
+// edge, where the event vanished and its chain lost its anchor.
+func TestTimelineWindowAlwaysContainsEveryEvent(t *testing.T) {
+	b := testBuilder(t)
+
+	for _, delay := range []int{0, 5, 14, 30, 60} {
+		ws := b.Build(contracts.ScenarioRequest{PayoutDelayDays: delay})
+
+		for _, e := range ws.Events {
+			if e.Date < ws.WindowStart || e.Date > ws.WindowEnd {
+				t.Errorf("delay %d: event %s on %s falls outside the window %s..%s",
+					delay, e.ID, e.Date, ws.WindowStart, ws.WindowEnd)
+			}
+		}
+		// Every chain must still resolve its root to a rendered event.
+		for _, c := range ws.Chains {
+			found := false
+			for _, e := range ws.Events {
+				if e.ID == c.RootEventID {
+					found = true
+				}
+			}
+			if !found {
+				t.Errorf("delay %d: chain %s roots at %q, which is not on the timeline",
+					delay, c.ID, c.RootEventID)
+			}
+		}
+	}
+}
+
+// A proposal dated far out must also stretch the window.
+func TestTimelineWindowCoversADistantProposal(t *testing.T) {
+	b := testBuilder(t)
+	far := b.Today.AddDate(0, 0, 75).Format(finance.DateLayout)
+	ws := b.Build(contracts.ScenarioRequest{
+		Proposal: &contracts.ProposedDecision{
+			Description: "Equipment", Category: "equipment", Date: far, AmountCents: 100_00,
+		},
+		HorizonDays: 90,
+	})
+	if ws.WindowEnd < far {
+		t.Fatalf("window ends %s, before the proposal on %s", ws.WindowEnd, far)
+	}
+}
+
+// A proposal must come back with the same window projected without it, so the
+// timeline can draw both paths and the owner reads the cost off the difference
+// rather than being told it.
+func TestProposalReturnsBothCashPaths(t *testing.T) {
+	b := testBuilder(t)
+	date := b.Today.AddDate(0, 0, 4).Format(finance.DateLayout)
+	ws := b.Build(contracts.ScenarioRequest{
+		Proposal: &contracts.ProposedDecision{
+			Description: "Ads", Category: "marketing", Date: date, AmountCents: 300_00,
+		},
+	})
+	s := ws.Scenario
+
+	if s.WithoutProposal == nil {
+		t.Fatal("a proposal must also return the path without it")
+	}
+	if len(s.WithoutProposal.Days) != len(s.Days) {
+		t.Fatalf("paths cover different windows: %d vs %d",
+			len(s.WithoutProposal.Days), len(s.Days))
+	}
+	// Spending money cannot raise the trough.
+	if s.LowestCents > s.WithoutProposal.LowestCents {
+		t.Errorf("the spend raised the lowest point: %d vs %d",
+			s.LowestCents, s.WithoutProposal.LowestCents)
+	}
+	if s.DeltaLowestCents != s.LowestCents-s.WithoutProposal.LowestCents {
+		t.Errorf("delta %d does not match the two paths", s.DeltaLowestCents)
+	}
+	// The two paths must be identical before the spend lands.
+	for i, d := range s.Days {
+		if d.Date >= date {
+			break
+		}
+		if d.ClosingCents != s.WithoutProposal.Days[i].ClosingCents {
+			t.Errorf("%s differs before the spend date: %d vs %d",
+				d.Date, d.ClosingCents, s.WithoutProposal.Days[i].ClosingCents)
+		}
+	}
+}
+
+// With no proposal there is nothing to compare, and the field must be absent
+// rather than an empty shell the UI would try to draw.
+func TestNoProposalMeansNoComparison(t *testing.T) {
+	b := testBuilder(t)
+	ws := b.Build(contracts.ScenarioRequest{})
+	if ws.Scenario.WithoutProposal != nil {
+		t.Fatal("no proposal, so there must be no comparison path")
+	}
+	if ws.Scenario.DeltaLowestCents != 0 {
+		t.Fatalf("delta = %d with no proposal", ws.Scenario.DeltaLowestCents)
+	}
+}
+
+// Every figure the demo ships as a constant must be replaceable by the owner,
+// and the projection must actually change when it is.
+func TestOwnerFiguresReplaceTheDemoConstants(t *testing.T) {
+	b := testBuilder(t)
+	base := b.Build(contracts.ScenarioRequest{})
+
+	balance := int64(900_000)
+	fee := 8.0
+	fx := 5.6
+	supplier := int64(-620_000)
+	date := b.Today.AddDate(0, 0, 6).Format(finance.DateLayout)
+
+	edited := b.Build(contracts.ScenarioRequest{
+		Assumptions: &contracts.AssumptionOverrides{
+			OpeningBalanceCents: &balance,
+			MarketplaceFeePct:   &fee,
+			BRLPerUSD:           &fx,
+			Outflows: map[string]contracts.OutflowOverride{
+				"asm-supplier": {AmountCents: &supplier, Date: &date},
+				"asm-rent":     {Removed: true},
+			},
+		},
+	})
+
+	if edited.Scenario.BaselineBalanceCents != balance {
+		t.Errorf("baseline = %d, want %d", edited.Scenario.BaselineBalanceCents, balance)
+	}
+	if edited.Scenario.LowestCents == base.Scenario.LowestCents {
+		t.Error("changing the inputs did not change the projection")
+	}
+
+	find := func(ws contracts.WorkspaceResponse, id string) *contracts.FinancialEvent {
+		for i := range ws.Events {
+			if ws.Events[i].ID == id {
+				return &ws.Events[i]
+			}
+		}
+		return nil
+	}
+	sup := find(edited, "evt-asm-supplier")
+	if sup == nil || sup.AmountCents != supplier || sup.Date != date {
+		t.Errorf("supplier payment not replaced: %+v", sup)
+	}
+	if find(edited, "evt-asm-rent") != nil {
+		t.Error("a removed payment must not stay on the timeline")
+	}
+	// A lower fee leaves more of the same recorded revenue to pay out.
+	if find(edited, "evt-payout").AmountCents == find(base, "evt-payout").AmountCents {
+		t.Error("changing the commission did not change the payout")
+	}
+}
+
+// A figure the owner supplied is theirs, and the badge must say so rather than
+// continuing to call it a demo assumption.
+func TestOverriddenFiguresChangeProvenance(t *testing.T) {
+	b := testBuilder(t)
+	fee := 8.0
+	ws := b.Build(contracts.ScenarioRequest{
+		Assumptions: &contracts.AssumptionOverrides{MarketplaceFeePct: &fee},
+	})
+
+	byID := map[string]contracts.Assumption{}
+	for _, a := range ws.Assumptions {
+		byID[a.ID] = a
+	}
+	if got := byID["asm-fee"].Provenance; got != contracts.ProvUserEntered {
+		t.Errorf("an edited commission should be user_entered, got %q", got)
+	}
+	// Untouched figures must NOT be relabelled as the owner's.
+	if got := byID["asm-ads"].Provenance; got != contracts.ProvDemoAssumption {
+		t.Errorf("an untouched figure must stay a demo assumption, got %q", got)
+	}
+	if got := byID["asm-timeshift"].Provenance; got != contracts.ProvDemoAssumption {
+		t.Errorf("the time shift is never the owner's, got %q", got)
+	}
+}
+
+// Removing every outflow must not break the projection.
+func TestRemovingEveryModelledPaymentStillProjects(t *testing.T) {
+	b := testBuilder(t)
+	ws := b.Build(contracts.ScenarioRequest{
+		Assumptions: &contracts.AssumptionOverrides{
+			Outflows: map[string]contracts.OutflowOverride{
+				"asm-supplier": {Removed: true},
+				"asm-ads":      {Removed: true},
+				"asm-rent":     {Removed: true},
+			},
+		},
+	})
+	if len(ws.Scenario.Days) == 0 {
+		t.Fatal("projection produced no days")
+	}
+	if ws.Scenario.BreachesReserve {
+		t.Error("with no outflows at all the reserve cannot be breached")
 	}
 }

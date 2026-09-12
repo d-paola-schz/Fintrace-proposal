@@ -3,8 +3,10 @@ import type { ScenarioRequest, SourceStatus, WorkspaceResponse } from './types/c
 import { api } from './lib/api'
 import { TimelineWorkspace } from './components/TimelineWorkspace'
 import { NodeEvidencePanel } from './components/NodeEvidencePanel'
-import { AlternativesBar, ScenarioControls } from './components/ScenarioControls'
+import { ScenarioControls } from './components/ScenarioControls'
+import { CashComparisonHeadline } from './components/CashComparison'
 import { ToneMark } from './components/Tone'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { TONE_STYLE } from './components/Tone'
 
 const EMPTY: ScenarioRequest = { payoutDelayDays: 0, proposal: null }
@@ -101,6 +103,9 @@ export default function App() {
   }
 
   const alertTone = ws.alert ? TONE_STYLE[ws.alert.tone] : null
+  // While a spend is on the table the comparison headline is the more precise
+  // statement of the same risk, so the generic banner stands down.
+  const comparing = !!ws.scenario.withoutProposal && !!ws.scenario.proposal
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -118,7 +123,7 @@ export default function App() {
         </span>
 
         <div className="ml-auto flex items-center gap-3">
-          {ws.sourceStatus.map((s) => (
+          {(ws.sourceStatus ?? []).map((s) => (
             <StatusDot key={s.name} status={s} />
           ))}
           <button
@@ -133,7 +138,7 @@ export default function App() {
 
       {showSources && <SourcePanel ws={ws} onClose={() => setShowSources(false)} />}
 
-      {ws.alert && alertTone && (
+      {ws.alert && alertTone && !comparing && (
         <button
           type="button"
           onClick={() => ws.alert?.focusNodeId && selectNode(ws.alert.focusNodeId)}
@@ -156,7 +161,7 @@ export default function App() {
         onChange={applyScenario}
         onReset={() => applyScenario(EMPTY)}
       />
-      <AlternativesBar ws={ws} scenario={scenario} onChange={applyScenario} />
+      <CashComparisonHeadline ws={ws} scenario={scenario} onChange={applyScenario} />
 
       {error && (
         <p className="shrink-0 bg-[#fdf3ec] px-4 py-1.5 text-[11.5px] text-[#8a4a1f]">{error}</p>
@@ -164,27 +169,31 @@ export default function App() {
 
       <main className="flex min-h-0 flex-1">
         <section className="min-w-0 flex-1">
-          <TimelineWorkspace
+          <ErrorBoundary area="The timeline">
+            <TimelineWorkspace
             ws={ws}
             selectedNodeId={nodeId}
             selectedEventId={eventId}
             onSelectNode={selectNode}
-            onSelectEvent={selectEvent}
-          />
+              onSelectEvent={selectEvent}
+            />
+          </ErrorBoundary>
         </section>
         <aside className="w-[410px] shrink-0 border-l border-hair bg-white">
-          <NodeEvidencePanel
+          <ErrorBoundary area="The detail panel">
+            <NodeEvidencePanel
             ws={ws}
             node={node}
             event={event}
             scenario={scenario}
             onApplyScenario={applyScenario}
             onSelectNode={selectNode}
-            onClose={() => {
-              setNodeId(null)
-              setEventId(null)
-            }}
-          />
+              onClose={() => {
+                setNodeId(null)
+                setEventId(null)
+              }}
+            />
+          </ErrorBoundary>
         </aside>
       </main>
 
@@ -239,7 +248,7 @@ function SourcePanel({ ws, onClose }: { ws: WorkspaceResponse; onClose: () => vo
         </button>
       </div>
       <div className="mt-2 grid gap-2 md:grid-cols-3">
-        {ws.sourceStatus.map((s) => (
+        {(ws.sourceStatus ?? []).map((s) => (
           <div
             key={s.name}
             className={`rounded-lg border p-2.5 ${
@@ -266,7 +275,7 @@ function SourcePanel({ ws, onClose }: { ws: WorkspaceResponse; onClose: () => vo
         ))}
       </div>
       <div className="mt-2 grid gap-2 md:grid-cols-2">
-        {ws.assumptions.map((a) => (
+        {(ws.assumptions ?? []).map((a) => (
           <div key={a.id} className="rounded-lg border border-hair bg-white p-2.5">
             <div className="flex items-start justify-between gap-2">
               <p className="text-[11.5px] font-semibold text-ink">{a.label}</p>

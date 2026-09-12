@@ -69,6 +69,26 @@ type Provider interface {
 	// Verify makes one minimal real call so the product can state whether the
 	// integration actually works, rather than that a key exists.
 	Verify(ctx context.Context) error
+	// Discover proposes which of the supplied timeline events deserve
+	// attention, in words only. It returns candidates for the engine to check;
+	// it never returns figures and never decides severity.
+	Discover(ctx context.Context, brief Brief) ([]Candidate, error)
+}
+
+// Brief is the factual material a discovery pass is allowed to see.
+type Brief struct {
+	Business string
+	// Events are "id | date | label | amount | provenance" lines.
+	Events []string
+	// Findings are the engine's own conclusions, already computed.
+	Findings []string
+}
+
+// Candidate is an unverified proposal from the model.
+type Candidate struct {
+	Title     string   `json:"title"`
+	Rationale string   `json:"rationale"`
+	EventRefs []string `json:"eventRefs"`
 }
 
 // Prompt carries the engine's own words. Facts is a pre-rendered list of
@@ -117,6 +137,9 @@ func (u *Unavailable) Status() contracts.SourceStatus {
 }
 func (u *Unavailable) Explain(context.Context, Prompt) (string, error) { return "", ErrUnavailable }
 func (u *Unavailable) Verify(context.Context) error                    { return ErrUnavailable }
+func (u *Unavailable) Discover(context.Context, Brief) ([]Candidate, error) {
+	return nil, ErrUnavailable
+}
 func (u *Unavailable) Route(context.Context, string, string) (Extraction, error) {
 	return Extraction{}, ErrUnavailable
 }
