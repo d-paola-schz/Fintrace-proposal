@@ -342,6 +342,26 @@ export interface WorkspaceResponse {
   alert?: WorkspaceAlert
   dataNotice: string
   generatedAt: string
+  /** Present only while a what-if is shown. */
+  branch?: WhatIfBranch
+}
+
+/**
+ * A what-if drawn as its own timeline beside the plan. The server decides what
+ * changed; the interface draws exactly that and never infers it.
+ */
+export interface WhatIfBranch {
+  label: string
+  /** Where the branch leaves the plan. Never before today. */
+  startDate: string
+  endDate: string
+  changedEventIds: string[]
+  removedEventIds: string[]
+  changedChainIds: string[]
+  unchangedChainIds: string[]
+  unchangedEventCount: number
+  /** Says that only differences are drawn, and what was left out. */
+  note: string
 }
 
 export interface ChatRequest {

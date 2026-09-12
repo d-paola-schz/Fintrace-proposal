@@ -427,6 +427,36 @@ type BriefingHighlight struct {
 	Summary string `json:"summary"`
 }
 
+// WhatIfBranch is a what-if drawn as its own timeline beside the plan.
+//
+// The owner reads both at once, so the what-if draws only what it changes. The
+// server decides what changed, never the interface: an event or chain counts
+// as changed when anything it would render differs from the plan's copy — a
+// date, an amount, a title, a tone, a figure or a chart point. Nothing is
+// hidden for merely looking similar, and nothing unchanged is drawn twice.
+type WhatIfBranch struct {
+	// Label names the what-if in the owner's terms, e.g. the spend and its date.
+	Label string `json:"label"`
+	// StartDate is where the branch leaves the plan: the earliest date of any
+	// event the what-if adds, moves, changes or removes, on either side of the
+	// change, and never before today.
+	StartDate string `json:"startDate"`
+	// EndDate is the end of the what-if's own window.
+	EndDate string `json:"endDate"`
+	// ChangedEventIDs are events whose what-if copy differs from the plan's, or
+	// that the plan does not contain at all.
+	ChangedEventIDs []string `json:"changedEventIds"`
+	// RemovedEventIDs are plan events the what-if does not contain.
+	RemovedEventIDs []string `json:"removedEventIds"`
+	ChangedChainIDs []string `json:"changedChainIds"`
+	// UnchangedChainIDs are chains that read exactly as they do on the plan.
+	UnchangedChainIDs []string `json:"unchangedChainIds"`
+	// UnchangedEventCount counts events identical in both, balance rows aside.
+	UnchangedEventCount int `json:"unchangedEventCount"`
+	// Note says in words that only differences are drawn, and what was left out.
+	Note string `json:"note"`
+}
+
 // Outlook is the first thing the owner reads: where the plan stands, and
 // separately, what could change it.
 type Outlook struct {
@@ -465,6 +495,9 @@ type WorkspaceResponse struct {
 	Alert           *WorkspaceAlert  `json:"alert,omitempty"`
 	DataNotice      string           `json:"dataNotice"`
 	GeneratedAt     string           `json:"generatedAt"`
+	// Branch is present only while a what-if is shown. It describes the what-if
+	// as a second timeline branching off the plan, and says what it changes.
+	Branch *WhatIfBranch `json:"branch,omitempty"`
 }
 
 // WorkspaceAlert is the single banner line. It must point at a real future event.
@@ -655,6 +688,12 @@ func (w *WorkspaceResponse) Sanitize() {
 	}
 	if w.Alert != nil {
 		w.Alert.EventIDs = nonNil(w.Alert.EventIDs)
+	}
+	if w.Branch != nil {
+		w.Branch.ChangedEventIDs = nonNil(w.Branch.ChangedEventIDs)
+		w.Branch.RemovedEventIDs = nonNil(w.Branch.RemovedEventIDs)
+		w.Branch.ChangedChainIDs = nonNil(w.Branch.ChangedChainIDs)
+		w.Branch.UnchangedChainIDs = nonNil(w.Branch.UnchangedChainIDs)
 	}
 	w.Scenario.Sanitize()
 }

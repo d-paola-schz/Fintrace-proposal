@@ -200,8 +200,9 @@ export function NodeDrawer({
       {sourcesBlock}
 
       <p className="text-[10.5px] leading-snug text-muted">
-        Worked out by Preflight's own rules, not by a language model. Lowest projected cash on
-        the current plan is <span className="tnum">{usd(ws.scenario.lowestCents)}</span>.
+        Worked out by Preflight's own rules, not by a language model. Lowest projected cash{' '}
+        {ws.branch ? 'with this what-if' : 'on the current plan'} is{' '}
+        <span className="tnum">{usd(ws.scenario.lowestCents)}</span>.
       </p>
       <p className="text-[9.5px] text-muted" title={node.ruleId}>
         Rule: {ruleName(node.ruleId)}
