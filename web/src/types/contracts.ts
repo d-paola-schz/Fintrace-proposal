@@ -253,6 +253,31 @@ export interface BusinessProfile {
   timeShiftNote: string
 }
 
+/**
+ * `kind` is load-bearing. "plan" describes the forecast as it stands;
+ * "conditional" describes what WOULD happen under a change that has not
+ * happened. They must never be rendered as one statement.
+ */
+export interface OutlookLine {
+  kind: 'plan' | 'conditional'
+  label: string
+  sentence: string
+  amountCents: number
+  date: string
+  tone: Tone
+  /** Server-decided qualifier; the client never infers it from the label. */
+  badge?: string
+  focusNodeId?: string
+  scenarioDelayDays?: number
+}
+
+export interface Outlook {
+  headline: string
+  status: 'on_track' | 'at_risk'
+  plan: OutlookLine
+  conditional?: OutlookLine
+}
+
 export interface WorkspaceAlert {
   tone: Tone
   message: string
@@ -270,6 +295,7 @@ export interface WorkspaceResponse {
   windowEnd: string
   events: FinancialEvent[]
   chains: Chain[]
+  outlook: Outlook
   scenario: ScenarioResult
   assumptions: Assumption[]
   sources: SourceRecord[]

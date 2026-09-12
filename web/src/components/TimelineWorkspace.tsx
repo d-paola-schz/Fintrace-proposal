@@ -4,50 +4,69 @@ import { addDays, daysBetween, shortDate, usd } from '../lib/format'
 import { CARD_H, CARD_H_COMPACT, CARD_W, EventCard } from './EventCard'
 import { BAND_H, CashComparison } from './CashComparison'
 import {
+  ChainPreview, PREVIEW_DROP, PREVIEW_H, previewStubPath,
+} from './ChainPreview'
+import {
   ChainNodeCard, ChainStrand, DEFAULT_METRICS, NODE_H, NODE_H_COMPACT, layoutChain,
   type ChainMetrics,
 } from './SerpentineChain'
 
 const PX_PER_DAY = 42
-const EDGE_PAD = 120
+const EDGE_PAD = 130
 const CARD_ROW_GAP = 6
-const MIN_CANVAS_H = 620
+const MIN_CANVAS_H = 460
 /** Thickness of the timeline rail the chains hang from. */
 const RAIL_H = 14
 
-/** The timeline is the first thing the owner understands: one horizontal axis
- *  through the middle of the workspace, with real space above and below it. */
+/**
+ * The timeline: one horizontal rail through the middle of the workspace, with
+ * dated events hanging from it and chains folding away from it.
+ *
+ * The rail now has the full width of the window — no panel compresses it — and
+ * only the chain the owner has opened is expanded. The others stay as compact
+ * tags, so the screen shows what was asked for rather than everything at once.
+ */
 export function TimelineWorkspace({
   ws,
   selectedNodeId,
   selectedEventId,
+  openChainId,
   onSelectNode,
   onSelectEvent,
+  onToggleChain,
+  rightInset = 0,
 }: {
   ws: WorkspaceResponse
   selectedNodeId: string | null
   selectedEventId: string | null
+  openChainId: string | null
   onSelectNode: (id: string) => void
   onSelectEvent: (id: string) => void
+  onToggleChain: (id: string) => void
+  /** Width of an open drawer, so nothing important is parked underneath it. */
+  rightInset?: number
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const frameRef = useRef<HTMLDivElement>(null)
   const [frameH, setFrameH] = useState(MIN_CANVAS_H)
+  const [frameW, setFrameW] = useState(1200)
   const didCenter = useRef(false)
 
   useLayoutEffect(() => {
     const el = frameRef.current
     if (!el) return
-    const ro = new ResizeObserver(([entry]) => {
-      setFrameH(Math.max(MIN_CANVAS_H, entry.contentRect.height))
-    })
+    const read = (r: DOMRectReadOnly | DOMRect) => {
+      setFrameH(Math.max(MIN_CANVAS_H, r.height))
+      setFrameW(r.width)
+    }
+    const ro = new ResizeObserver(([entry]) => read(entry.contentRect))
     ro.observe(el)
-    setFrameH(Math.max(MIN_CANVAS_H, el.getBoundingClientRect().height))
+    read(el.getBoundingClientRect())
     return () => ro.disconnect()
   }, [])
 
   const totalDays = Math.max(1, daysBetween(ws.windowStart, ws.windowEnd))
-  const canvasW = totalDays * PX_PER_DAY + EDGE_PAD * 2
+  const canvasW = Math.max(frameW, totalDays * PX_PER_DAY + EDGE_PAD * 2) + rightInset
   const x = useMemo(
     () => (iso: string) => EDGE_PAD + daysBetween(ws.windowStart, iso) * PX_PER_DAY,
     [ws.windowStart],
@@ -72,84 +91,86 @@ export function TimelineWorkspace({
     })
   }, [ws.events, ws.windowStart, ws.windowEnd, x])
 
-  // Vertical budget. Below roughly 700px of workspace the comfortable sizes no
-  // longer fit two three-level chains around a centred axis, and the lowest
-  // node drops below the fold — which is exactly what happens on a 1366x768
-  // laptop or a 720p projector. Shrink the boxes rather than hide a node.
-  const compact = frameH < 700
+  const compact = frameH < 560
   const nodeH = compact ? NODE_H_COMPACT : NODE_H
   const cardH = compact ? CARD_H_COMPACT : CARD_H
 
   const rowCount = Math.max(1, ...placed.map((p) => p.row + 1))
   const cardBandH = rowCount * (cardH + CARD_ROW_GAP)
 
-  // The axis sits at the centre of the workspace whenever the chains fit; when
-  // they do not, it moves just far enough for the upper chain to be whole and
-  // the canvas scrolls rather than clipping a node.
-  const GAP_FLOOR = nodeH + 8
-  const FIRST_ABOVE = compact ? 26 : DEFAULT_METRICS.firstLevel
-  // While a spend is being weighed, the two cash paths occupy the band just
-  // under the rail and the chain below starts lower.
   const comparing = !!ws.scenario.withoutProposal && !!ws.scenario.proposal
-  const bandTop = 26
-  const FIRST_BELOW = (compact ? 46 : 54) + (comparing ? bandTop + BAND_H + 14 : 0)
+  const bandTop = 24
+
+  const openChain = ws.chains.find((c) => c.id === openChainId) ?? null
+  const openAbove = openChain?.direction === 'above'
+  const openBelow = openChain?.direction === 'below'
+
+  // Vertical budget. Only the open chain needs room for three levels; a
+  // collapsed chain needs a tag's worth.
+  const GAP_FLOOR = nodeH + 8
+  const FIRST_ABOVE = compact ? 26 : 32
+  const FIRST_BELOW = (compact ? 46 : 54) + (comparing ? bandTop + BAND_H + 12 : 0)
 
   const clampGap = (avail: number, first: number) =>
-    Math.round(Math.min(122, Math.max(GAP_FLOOR, (avail - nodeH - first) / 2)))
+    Math.round(Math.min(120, Math.max(GAP_FLOOR, (avail - nodeH - first) / 2)))
 
-  const gapAbove = clampGap(frameH / 2 - cardBandH - (compact ? 38 : 48), FIRST_ABOVE)
-  const aboveNeed =
-    cardBandH + 22 + FIRST_ABOVE + 2 * gapAbove + nodeH / 2 + (compact ? 20 : 26)
+  const collapsedAboveNeed = cardBandH + 20 + PREVIEW_DROP + PREVIEW_H + 26
+  const gapAbove = clampGap(frameH / 2 - cardBandH - (compact ? 36 : 46), FIRST_ABOVE)
+  const expandedAboveNeed =
+    cardBandH + 20 + FIRST_ABOVE + 2 * gapAbove + nodeH / 2 + (compact ? 20 : 26)
+  const aboveNeed = openAbove ? expandedAboveNeed : collapsedAboveNeed
+
   const axisY = Math.max(Math.round(frameH / 2), Math.round(aboveNeed))
-  const gapBelow = clampGap(Math.max(frameH, axisY + 200) - axisY - 46, FIRST_BELOW)
-  const belowNeed = FIRST_BELOW + 2 * gapBelow + nodeH / 2 + (compact ? 30 : 40)
+  const gapBelow = clampGap(Math.max(frameH, axisY + 190) - axisY - 44, FIRST_BELOW)
+  const belowNeed = openBelow
+    ? FIRST_BELOW + 2 * gapBelow + nodeH / 2 + (compact ? 28 : 38)
+    : FIRST_BELOW + PREVIEW_DROP + PREVIEW_H + 30
   const canvasH = Math.max(frameH, Math.round(axisY + belowNeed))
 
-  // Row 0 sits nearest the axis; later rows stack further away from it.
-  const cardTop = (row: number) => axisY - 22 - (row + 1) * (cardH + CARD_ROW_GAP)
+  const cardTop = (row: number) => axisY - 20 - (row + 1) * (cardH + CARD_ROW_GAP)
 
   const metricsFor = (dir: 1 | -1): ChainMetrics =>
     dir === 1
       ? { ...DEFAULT_METRICS, firstLevel: FIRST_BELOW, levelGap: gapBelow, nodeH }
       : { ...DEFAULT_METRICS, firstLevel: FIRST_ABOVE, levelGap: gapAbove, nodeH }
 
-  const chainAnchor = (chain: Chain) => {
+  const anchorFor = (chain: Chain) => {
     const root = ws.events.find((e) => e.id === chain.rootEventId)
     const anchorX = root ? x(root.date) : EDGE_PAD
     if (chain.direction === 'below') return { anchorX, anchorY: axisY, dir: 1 as const }
-    // An above-axis chain hangs off the top of the card band so it never
-    // collides with the dated cards.
-    return { anchorX, anchorY: axisY - cardBandH - 22, dir: -1 as const }
+    return { anchorX, anchorY: axisY - cardBandH - 20, dir: -1 as const }
   }
 
-  const layouts = useMemo(
-    () =>
-      ws.chains.map((chain) => {
-        const { anchorX, anchorY, dir } = chainAnchor(chain)
-        const flip = anchorX + DEFAULT_METRICS.run + 40 > canvasW
-        return { chain, layout: layoutChain(chain, anchorX, anchorY, dir, flip, metricsFor(dir)) }
-      }),
+  const openLayout = useMemo(() => {
+    if (!openChain) return null
+    const { anchorX, anchorY, dir } = anchorFor(openChain)
+    return { chain: openChain, layout: layoutChain(openChain, anchorX, anchorY, dir, false, metricsFor(dir)) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ws.chains, ws.events, axisY, cardBandH, canvasW, gapAbove, gapBelow, nodeH, comparing],
-  )
+  }, [openChain, ws.events, axisY, cardBandH, gapAbove, gapBelow, nodeH, FIRST_BELOW])
 
-  // Open on today, with the future — where the decisions are — in view.
   useEffect(() => {
     if (didCenter.current || !scrollRef.current) return
     const el = scrollRef.current
-    el.scrollLeft = Math.max(0, x(ws.today) - el.clientWidth * 0.42)
+    el.scrollLeft = Math.max(0, x(ws.today) - el.clientWidth * 0.46)
     didCenter.current = true
   }, [ws.today, x])
 
-  // The moment a spend is being weighed, put the rail and the two cash paths
-  // in view. Otherwise the comparison can render below the fold on a short
-  // screen and the owner never sees the thing they asked for.
+  // Bring whatever the owner just opened into view, and keep it clear of the
+  // drawer: a chain explained by a panel sitting on top of it is no use.
   useEffect(() => {
     const el = scrollRef.current
-    if (!el || !comparing) return
-    const target = Math.max(0, axisY - RAIL_H - 56)
-    el.scrollTo({ top: target, behavior: 'smooth' })
-  }, [comparing, axisY])
+    if (!el) return
+    if (comparing) {
+      el.scrollTo({ top: Math.max(0, axisY - RAIL_H - 52), behavior: 'smooth' })
+    } else if (!openChain) {
+      el.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+    if (openLayout) {
+      const visible = Math.max(240, el.clientWidth - rightInset)
+      const centre = (openLayout.layout.minX + openLayout.layout.maxX) / 2
+      el.scrollTo({ left: Math.max(0, centre - visible / 2), behavior: 'smooth' })
+    }
+  }, [comparing, openChain, axisY, openLayout, rightInset])
 
   const todayX = x(ws.today)
   const ticks = useMemo(() => {
@@ -161,8 +182,8 @@ export function TimelineWorkspace({
     return out
   }, [ws.windowStart, totalDays])
 
-  const highlighted = new Set(ws.alert?.eventIds ?? [])
   const chainRoots = new Set(ws.chains.map((c) => c.rootEventId))
+  const railEnd = canvasW - EDGE_PAD + 44
 
   return (
     <div ref={frameRef} className="relative h-full min-h-0">
@@ -170,19 +191,12 @@ export function TimelineWorkspace({
         ref={scrollRef}
         className="scrollbar-thin h-full overflow-auto"
         role="region"
-        aria-label="Financial timeline"
+        aria-label="Financial timeline. Use Tab to move between events and chains."
+        tabIndex={0}
       >
         <div className="relative" style={{ width: canvasW, height: canvasH }}>
-          {/* ---- the rail, the strands, and the dated anchors ---- */}
-          <svg
-            className="pointer-events-none absolute inset-0"
-            width={canvasW}
-            height={canvasH}
-            aria-hidden
-          >
+          <svg className="pointer-events-none absolute inset-0" width={canvasW} height={canvasH} aria-hidden>
             <defs>
-              {/* The rail reads as a machined bar: light along the top edge,
-                  shadowed underneath, so the chains visibly hang from it. */}
               <linearGradient id="railRecorded" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#7ba7f5" />
                 <stop offset="42%" stopColor="#2563eb" />
@@ -193,188 +207,123 @@ export function TimelineWorkspace({
                 <stop offset="42%" stopColor="#9dbdf6" />
                 <stop offset="100%" stopColor="#7c9fdc" />
               </linearGradient>
-              <pattern
-                id="railHatch" width="7" height="7"
-                patternUnits="userSpaceOnUse" patternTransform="rotate(45)"
-              >
+              <pattern id="railHatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
                 <rect width="7" height="7" fill="none" />
                 <line x1="0" y1="0" x2="0" y2="7" stroke="#ffffff" strokeWidth="2.6" opacity="0.55" />
               </pattern>
               <filter id="railShadow" x="-2%" y="-320%" width="104%" height="740%">
-                <feDropShadow dx="0" dy="2" stdDeviation="2.4" floodColor="#17408f" floodOpacity="0.26" />
+                <feDropShadow dx="0" dy="2" stdDeviation="2.4" floodColor="#17408f" floodOpacity="0.24" />
               </filter>
             </defs>
 
-            {/* recorded run: solid bar */}
             <g filter="url(#railShadow)">
-              <rect
-                x={EDGE_PAD - 44}
-                y={axisY - RAIL_H / 2}
-                width={Math.max(0, todayX - (EDGE_PAD - 44))}
-                height={RAIL_H}
-                rx={RAIL_H / 2}
-                fill="url(#railRecorded)"
-              />
-              {/* projected run: same bar, lighter, hatched so "not yet real"
-                  is carried by texture and not by colour alone */}
-              <rect
-                x={todayX}
-                y={axisY - RAIL_H / 2}
-                width={Math.max(0, canvasW - EDGE_PAD + 44 - todayX)}
-                height={RAIL_H}
-                rx={RAIL_H / 2}
-                fill="url(#railProjected)"
-              />
-              <rect
-                x={todayX}
-                y={axisY - RAIL_H / 2}
-                width={Math.max(0, canvasW - EDGE_PAD + 44 - todayX)}
-                height={RAIL_H}
-                rx={RAIL_H / 2}
-                fill="url(#railHatch)"
-                opacity={0.5}
-              />
+              <rect x={EDGE_PAD - 44} y={axisY - RAIL_H / 2}
+                width={Math.max(0, todayX - (EDGE_PAD - 44))} height={RAIL_H}
+                rx={RAIL_H / 2} fill="url(#railRecorded)" />
+              <rect x={todayX} y={axisY - RAIL_H / 2}
+                width={Math.max(0, railEnd - todayX)} height={RAIL_H}
+                rx={RAIL_H / 2} fill="url(#railProjected)" />
+              <rect x={todayX} y={axisY - RAIL_H / 2}
+                width={Math.max(0, railEnd - todayX)} height={RAIL_H}
+                rx={RAIL_H / 2} fill="url(#railHatch)" opacity={0.5} />
             </g>
-            {/* machined highlight along the top edge */}
-            <line
-              x1={EDGE_PAD - 40}
-              y1={axisY - RAIL_H / 2 + 1.6}
-              x2={canvasW - EDGE_PAD + 40}
-              y2={axisY - RAIL_H / 2 + 1.6}
-              stroke="#ffffff"
-              strokeWidth={1.2}
-              opacity={0.42}
-              strokeLinecap="round"
-            />
+            <line x1={EDGE_PAD - 40} y1={axisY - RAIL_H / 2 + 1.6} x2={railEnd - 4}
+              y2={axisY - RAIL_H / 2 + 1.6} stroke="#ffffff" strokeWidth={1.2}
+              opacity={0.42} strokeLinecap="round" />
 
-            {/* date ticks read below the rail */}
             {ticks.map((iso) => (
               <g key={iso}>
-                <line
-                  x1={x(iso)}
-                  y1={axisY + RAIL_H / 2 + 2}
-                  x2={x(iso)}
-                  y2={axisY + RAIL_H / 2 + 7}
-                  stroke="#9aa8bd"
-                  strokeWidth={1}
-                />
-                <text
-                  x={x(iso)}
-                  y={axisY + RAIL_H / 2 + 20}
-                  textAnchor="middle"
-                  className="tnum"
-                  fontSize={10}
-                  fill="#7a8598"
-                >
+                <line x1={x(iso)} y1={axisY + RAIL_H / 2 + 2} x2={x(iso)}
+                  y2={axisY + RAIL_H / 2 + 7} stroke="#9aa8bd" strokeWidth={1} />
+                <text x={x(iso)} y={axisY + RAIL_H / 2 + 20} textAnchor="middle"
+                  className="tnum" fontSize={10.5} fill="#7a8598">
                   {shortDate(iso)}
                 </text>
               </g>
             ))}
 
-            {/* today: a beam through the whole workspace */}
-            <line
-              x1={todayX}
-              y1={28}
-              x2={todayX}
-              y2={canvasH - 28}
-              stroke="var(--color-flow)"
-              strokeWidth={1.25}
-              strokeDasharray="2 7"
-              opacity={0.34}
-            />
+            <line x1={todayX} y1={24} x2={todayX} y2={canvasH - 24}
+              stroke="var(--color-flow)" strokeWidth={1.25} strokeDasharray="2 7" opacity={0.3} />
 
-            {/* each dated card hangs from a bolt seated in the rail */}
             {placed.map(({ event, row }) => {
-              const hot = highlighted.has(event.id)
+              const hot = event.id === selectedEventId
               return (
                 <g key={`stem-${event.id}`}>
-                  <line
-                    x1={x(event.date)}
-                    y1={cardTop(row) + cardH}
-                    x2={x(event.date)}
-                    y2={axisY - RAIL_H / 2}
-                    stroke={hot ? 'var(--color-flow)' : '#b9c4d6'}
-                    strokeWidth={hot ? 1.6 : 1.1}
-                  />
-                  <circle
-                    cx={x(event.date)}
-                    cy={axisY}
-                    r={hot ? 5.6 : 4.4}
-                    fill="#ffffff"
-                    stroke={hot ? '#17408f' : '#2f5fbe'}
-                    strokeWidth={hot ? 2.2 : 1.8}
-                  />
+                  <line x1={x(event.date)} y1={cardTop(row) + cardH} x2={x(event.date)}
+                    y2={axisY - RAIL_H / 2} stroke={hot ? 'var(--color-flow)' : '#b9c4d6'}
+                    strokeWidth={hot ? 1.6 : 1.1} />
+                  <circle cx={x(event.date)} cy={axisY} r={hot ? 5.6 : 4.4} fill="#ffffff"
+                    stroke={hot ? '#17408f' : '#2f5fbe'} strokeWidth={hot ? 2.2 : 1.8} />
                   <circle cx={x(event.date)} cy={axisY} r={hot ? 2 : 1.5} fill="#17408f" />
                 </g>
               )
             })}
 
+            {/* stubs for collapsed chains */}
+            {ws.chains.filter((c) => c.id !== openChainId).map((c) => {
+              const { anchorX, dir } = anchorFor(c)
+              const from = dir === 1 ? axisY : axisY - cardBandH - 20
+              const to = dir === 1 ? from + PREVIEW_DROP : from - PREVIEW_DROP
+              return (
+                <path key={`stub-${c.id}`} d={previewStubPath(anchorX, from, to)}
+                  fill="none" stroke="#b9a48c" strokeWidth={2.6} strokeDasharray="1.2 6"
+                  strokeLinecap="round" opacity={0.85} />
+              )
+            })}
+
             {comparing && (
-              <CashComparison
-                scenario={ws.scenario}
-                x={x}
-                top={axisY + RAIL_H / 2 + bandTop}
-              />
+              <CashComparison scenario={ws.scenario} x={x} top={axisY + RAIL_H / 2 + bandTop} />
             )}
 
-            {layouts.map(({ chain, layout }) => (
-              <ChainStrand key={chain.id} layout={layout} />
-            ))}
+            {openLayout && <ChainStrand layout={openLayout.layout} />}
           </svg>
 
-          {/* ---- today marker ---- */}
-          <div
-            className="absolute z-20 -translate-x-1/2 rounded-full border border-[#c8d9f7] bg-white px-2.5 py-1 shadow-sm"
-            style={{ left: todayX, top: axisY - RAIL_H / 2 - 27 }}
-          >
-            <span className="tnum whitespace-nowrap text-[10.5px] font-semibold text-[#26457f]">
+          <div className="absolute z-20 -translate-x-1/2 rounded-full border border-[#c8d9f7] bg-white px-3 py-1 shadow-sm"
+            style={{ left: todayX, top: axisY - RAIL_H / 2 - 28 }}>
+            <span className="tnum whitespace-nowrap text-[11px] font-semibold text-[#26457f]">
               Today · {usd(ws.scenario.baselineBalanceCents)}
             </span>
           </div>
 
-          {/* ---- dated events ---- */}
           {placed.map(({ event, row }) => (
-            <EventCard
-              key={event.id}
-              event={event}
-              x={x(event.date)}
-              y={cardTop(row)}
-              h={cardH}
-              hasChain={chainRoots.has(event.id)}
-              highlighted={highlighted.has(event.id)}
-              selected={selectedEventId === event.id}
-              onSelect={onSelectEvent}
-            />
+            <EventCard key={event.id} event={event} x={x(event.date)} y={cardTop(row)} h={cardH}
+              hasChain={chainRoots.has(event.id)} highlighted={false}
+              selected={selectedEventId === event.id} onSelect={onSelectEvent} />
           ))}
 
-          {/* ---- chain nodes ---- */}
-          {layouts.map(({ chain, layout }) => (
-            <div key={chain.id}>
-              <div
-                className="absolute z-10 -translate-x-1/2 whitespace-nowrap text-[9.5px] font-semibold uppercase tracking-[0.1em] text-muted"
+          {/* collapsed chains */}
+          {ws.chains.filter((c) => c.id !== openChainId).map((c) => {
+            const { anchorX, dir } = anchorFor(c)
+            const from = dir === 1 ? axisY : axisY - cardBandH - 20
+            const to = dir === 1 ? from + PREVIEW_DROP : from - PREVIEW_DROP
+            return (
+              <ChainPreview key={c.id} chain={c} x={anchorX} y={to} dir={dir}
+                selected={false} onSelect={onToggleChain} />
+            )
+          })}
+
+          {/* the open chain */}
+          {openLayout && (
+            <div>
+              <button
+                type="button"
+                onClick={() => onToggleChain(openLayout.chain.id)}
+                className="absolute z-10 -translate-x-1/2 rounded-full border border-hair bg-white px-2.5 py-[3px] text-[10.5px] font-medium text-muted hover:border-[#c8d9f7] hover:text-ink"
                 style={{
-                  left: (layout.minX + layout.maxX) / 2,
-                  top:
-                    chain.direction === 'below'
-                      ? layout.maxY + 8
-                      : Math.max(2, layout.minY - 18),
+                  left: (openLayout.layout.minX + openLayout.layout.maxX) / 2,
+                  top: openLayout.chain.direction === 'below'
+                    ? openLayout.layout.maxY + 10
+                    : Math.max(2, openLayout.layout.minY - 24),
                 }}
               >
-                {chain.title} chain
-              </div>
-              {layout.levels.map((lv) => (
-                <ChainNodeCard
-                  key={lv.node.id}
-                  node={lv.node}
-                  x={lv.nodeX}
-                  y={lv.y}
-                  h={nodeH}
-                  selected={selectedNodeId === lv.node.id}
-                  onSelect={onSelectNode}
-                />
+                {openLayout.chain.title} · close
+              </button>
+              {openLayout.layout.levels.map((lv) => (
+                <ChainNodeCard key={lv.node.id} node={lv.node} x={lv.nodeX} y={lv.y} h={nodeH}
+                  selected={selectedNodeId === lv.node.id} onSelect={onSelectNode} />
               ))}
             </div>
-          ))}
+          )}
         </div>
       </div>
     </div>

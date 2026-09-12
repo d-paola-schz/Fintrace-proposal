@@ -37,6 +37,7 @@ func (b *Builder) Build(req contracts.ScenarioRequest) contracts.WorkspaceRespon
 		WindowEnd:       end,
 		Events:          displayEvents,
 		Chains:          chains,
+		Outlook:         b.BuildOutlook(res, displayEvents),
 		Scenario:        res,
 		Assumptions:     b.Assumptions(res),
 		Sources:         b.Sources(),
@@ -93,6 +94,24 @@ func (b *Builder) RunScenario(req contracts.ScenarioRequest, events []contracts.
 	delayIn := in
 	delayIn.Events = unshifted
 	res.DelayBreakpoint = finance.FindFirstBreachingDelay(delayIn, finance.DefaultDelayHorizonDays)
+
+	// The plan as it actually stands: payout on time, nothing proposed. Kept
+	// beside every scenario so a what-if can never be read as where they are.
+	res.ScenarioActive = req.PayoutDelayDays != 0 || hasProposal
+	if res.ScenarioActive {
+		plainIn := in
+		plainIn.Events = events
+		plain := finance.Project(plainIn)
+		res.OnTimePlan = &contracts.CashPath{
+			Label:           "Current plan",
+			Days:            plain.Days,
+			LowestCents:     plain.LowestCents,
+			LowestDate:      plain.LowestDate,
+			HeadroomCents:   plain.HeadroomCents,
+			BreachesReserve: plain.BreachesReserve,
+			FirstBreachDate: plain.FirstBreachDate,
+		}
+	}
 	if hasProposal {
 		p := *req.Proposal
 		p.MinimumReserveCents = reserve

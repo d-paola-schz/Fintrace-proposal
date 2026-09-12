@@ -54,7 +54,7 @@ func (b *Builder) payoutTimingChain(res contracts.ScenarioResult, events []contr
 	// ---- Node 01: what is actually on the calendar. Observed, needs review.
 	n1 := contracts.ChainNode{
 		ID: "node-payout-1", ChainID: chain.ID, RootEventID: "evt-payout", Sequence: 1,
-		Title:  "A supplier payment stands before the payout",
+		Title:  "Payment comes first",
 		Tone:   contracts.ToneReview,
 		Status: contracts.StatusObserved,
 		RuleID: RulePayoutTiming,
@@ -107,9 +107,9 @@ func (b *Builder) payoutTimingChain(res contracts.ScenarioResult, events []contr
 	if bp.Found {
 		n2.Tone = contracts.ToneRisk
 		if bp.DelayDays == 0 {
-			n2.Title = "The reserve breaks even with the payout on time"
+			n2.Title = "The gap is already there"
 		} else {
-			n2.Title = fmt.Sprintf("A %d-day payout delay breaks the reserve", bp.DelayDays)
+			n2.Title = fmt.Sprintf("A %d-day delay creates a gap", bp.DelayDays)
 		}
 		n2.Summary = fmt.Sprintf("First breach %s, cash %s",
 			finance.HumanDate(bp.BreachDate), finance.FormatUSD(bp.LowestCents))
@@ -125,7 +125,7 @@ func (b *Builder) payoutTimingChain(res contracts.ScenarioResult, events []contr
 		}
 	} else {
 		n2.Tone = contracts.ToneReview
-		n2.Title = "No payout delay tested breaks the reserve"
+		n2.Title = "A delay would not break it"
 		n2.Summary = fmt.Sprintf("Tested to %d days", bp.TestedUpToDays)
 		n2.Explanation = bp.Explanation +
 			" That holds only for the outflows currently modeled; adding a new commitment can change it."
@@ -156,7 +156,7 @@ func (b *Builder) payoutTimingChain(res contracts.ScenarioResult, events []contr
 	// ---- Node 03: what the owner could do. Always a proposal, never an action.
 	n3 := contracts.ChainNode{
 		ID: "node-payout-3", ChainID: chain.ID, RootEventID: "evt-payout", Sequence: 3,
-		Title:   "Two levers that hold the reserve",
+		Title:   "Two ways to protect the reserve",
 		Tone:    contracts.ToneOpportunity,
 		Status:  contracts.StatusAction,
 		RuleID:  RulePayoutTiming,
@@ -221,7 +221,7 @@ func (b *Builder) salesStockChain() contracts.Chain {
 
 	n1 := contracts.ChainNode{
 		ID: "node-sales-1", ChainID: chain.ID, RootEventID: rootID, Sequence: 1,
-		Title:  fmt.Sprintf("Item revenue up %.1f%% on the same item count", deltaPct),
+		Title:  fmt.Sprintf("Revenue up %.1f%%, same volume", deltaPct),
 		Tone:   contracts.ToneOpportunity,
 		Status: contracts.StatusObserved,
 		RuleID: RuleSalesStock,
@@ -280,7 +280,7 @@ func (b *Builder) salesStockChain() contracts.Chain {
 
 	n2 := contracts.ChainNode{
 		ID: "node-sales-2", ChainID: chain.ID, RootEventID: rootID, Sequence: 2,
-		Title:   fmt.Sprintf("One product is %.0f%% of the window's items", topShare),
+		Title:   fmt.Sprintf("One product carries %.0f%%", topShare),
 		Tone:    contracts.ToneReview,
 		Status:  contracts.StatusInferred,
 		RuleID:  RuleSalesStock,
@@ -311,7 +311,7 @@ func (b *Builder) salesStockChain() contracts.Chain {
 
 	n3 := contracts.ChainNode{
 		ID: "node-sales-3", ChainID: chain.ID, RootEventID: rootID, Sequence: 3,
-		Title:   "Whether to reorder cannot be answered here",
+		Title:   "Reordering needs a number we lack",
 		Tone:    contracts.ToneReview,
 		Status:  contracts.StatusPossible,
 		RuleID:  RuleSalesStock,

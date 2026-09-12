@@ -323,9 +323,16 @@ type ScenarioResult struct {
 	WithoutProposal *CashPath `json:"withoutProposal,omitempty"`
 	// DeltaLowestCents is proposed lowest minus current lowest: what the spend
 	// costs at the tightest moment. Negative means the trough drops.
-	DeltaLowestCents int64           `json:"deltaLowestCents"`
-	DelayBreakpoint  DelayBreakpoint `json:"delayBreakpoint"`
-	Alternatives     []Alternative   `json:"alternatives"`
+	DeltaLowestCents int64 `json:"deltaLowestCents"`
+	// OnTimePlan is the projection with no delay and no proposal: the plan as it
+	// stands. Present whenever a scenario is being viewed, so the owner always
+	// has the real plan to compare against and can never mistake a what-if for
+	// where they actually are.
+	OnTimePlan *CashPath `json:"onTimePlan,omitempty"`
+	// ScenarioActive says a what-if is being shown rather than the plan.
+	ScenarioActive  bool            `json:"scenarioActive"`
+	DelayBreakpoint DelayBreakpoint `json:"delayBreakpoint"`
+	Alternatives    []Alternative   `json:"alternatives"`
 
 	AppliedEvents []FinancialEvent `json:"appliedEvents"`
 	Assumptions   []Assumption     `json:"assumptions"`
@@ -335,6 +342,40 @@ type ScenarioResult struct {
 	Verdict string `json:"verdict"`
 	// Caveats always includes the affordability-is-not-ROI statement.
 	Caveats []string `json:"caveats"`
+}
+
+// OutlookLine is one statement about the cash position.
+//
+// Kind is load-bearing. "plan" describes the forecast as it currently stands;
+// "conditional" describes what WOULD happen under a change that has not
+// happened. Presenting a conditional as if it were the plan is the single most
+// misleading thing this product could do, so the two are separated here rather
+// than left to the wording of a sentence.
+type OutlookLine struct {
+	Kind        string `json:"kind"` // plan | conditional
+	Label       string `json:"label"`
+	Sentence    string `json:"sentence"`
+	AmountCents int64  `json:"amountCents"`
+	Date        string `json:"date"`
+	Tone        string `json:"tone"`
+	// Badge is the short qualifier shown beside the label. The server decides
+	// it so the client never has to infer meaning from label wording.
+	Badge string `json:"badge,omitempty"` // "hasn't happened" | "unchanged"
+	// FocusNodeID opens the chain node that explains this line.
+	FocusNodeID string `json:"focusNodeId,omitempty"`
+	// ScenarioDelayDays is the delay this line describes, for a one-click try.
+	ScenarioDelayDays int `json:"scenarioDelayDays,omitempty"`
+}
+
+// Outlook is the first thing the owner reads: where the plan stands, and
+// separately, what could change it.
+type Outlook struct {
+	Headline string      `json:"headline"`
+	Status   string      `json:"status"` // on_track | at_risk
+	Plan     OutlookLine `json:"plan"`
+	// Conditional is absent when nothing within the tested range changes the
+	// answer. It is never merged into Plan.
+	Conditional *OutlookLine `json:"conditional,omitempty"`
 }
 
 // WorkspaceResponse is the initial payload for the workspace.
@@ -351,6 +392,7 @@ type WorkspaceResponse struct {
 	Assumptions     []Assumption     `json:"assumptions"`
 	Sources         []SourceRecord   `json:"sources"`
 	SourceStatus    []SourceStatus   `json:"sourceStatus"`
+	Outlook         Outlook          `json:"outlook"`
 	Alert           *WorkspaceAlert  `json:"alert,omitempty"`
 	DataNotice      string           `json:"dataNotice"`
 	GeneratedAt     string           `json:"generatedAt"`
@@ -503,6 +545,12 @@ func (r *ScenarioResult) Sanitize() {
 	r.Claims = sanitizeClaims(r.Claims)
 	r.Alternatives = nonNil(r.Alternatives)
 	r.Caveats = nonNil(r.Caveats)
+	if r.OnTimePlan != nil {
+		r.OnTimePlan.Days = nonNil(r.OnTimePlan.Days)
+		for i := range r.OnTimePlan.Days {
+			r.OnTimePlan.Days[i].EventIDs = nonNil(r.OnTimePlan.Days[i].EventIDs)
+		}
+	}
 	if r.WithoutProposal != nil {
 		r.WithoutProposal.Days = nonNil(r.WithoutProposal.Days)
 		for i := range r.WithoutProposal.Days {
