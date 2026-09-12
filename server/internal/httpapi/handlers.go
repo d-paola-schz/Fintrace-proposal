@@ -339,8 +339,17 @@ func (s *Server) answer(ctx context.Context, b *workspace.Builder, ws contracts.
 		if len(missing) > 0 {
 			resp.AnswerSource = "engine_fallback"
 			resp.MissingInputs = missing
+			// Hand back what the question did supply so the form can ask only
+			// for the rest.
+			resp.PartialProposal = &contracts.ProposedDecision{
+				Description:         firstNonEmpty(extracted.Description, "Purchase"),
+				Category:            firstNonEmpty(extracted.Category, "other"),
+				Date:                extracted.Date,
+				AmountCents:         extracted.AmountCents,
+				MinimumReserveCents: ws.Scenario.ReserveCents,
+			}
 			resp.Answer = "Before running this I need " + missingList(missing) +
-				". Enter it in the proposal card and Preflight will project every day against your reserve."
+				". Fill it in below and Preflight will project every day against your reserve."
 			return resp
 		}
 		change := contracts.ScenarioRequest{
@@ -545,6 +554,15 @@ func buildProposal(e ai.Extraction, ws contracts.WorkspaceResponse, today time.T
 		Description: desc, Category: cat, Date: date,
 		AmountCents: e.AmountCents, MinimumReserveCents: ws.Scenario.ReserveCents,
 	}, nil
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if strings.TrimSpace(v) != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 func missingList(m []contracts.MissingInput) string {

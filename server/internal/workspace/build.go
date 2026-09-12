@@ -37,6 +37,7 @@ func (b *Builder) Build(req contracts.ScenarioRequest) contracts.WorkspaceRespon
 		WindowEnd:       end,
 		Events:          displayEvents,
 		Chains:          chains,
+		Briefing:        b.BuildBriefing(res, displayEvents, chains),
 		Outlook:         b.BuildOutlook(res, displayEvents),
 		Scenario:        res,
 		Assumptions:     b.Assumptions(res),

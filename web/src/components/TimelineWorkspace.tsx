@@ -3,13 +3,14 @@ import type { Chain, WorkspaceResponse } from '../types/contracts'
 import { addDays, daysBetween, parseDay, shortDate, usd } from '../lib/format'
 import { CARD_H, CARD_H_COMPACT, CARD_W, EventCard } from './EventCard'
 import { BAND_H, CashComparison } from './CashComparison'
+import { ChainEntry, ENTRY_DROP, ENTRY_H } from './ChainEntry'
 import {
   ChainNodeCard, ChainStrand, DEFAULT_METRICS, NODE_H, NODE_H_COMPACT, layoutChain,
   type ChainMetrics,
 } from './SerpentineChain'
 
 const PX_PER_DAY = 42
-const EDGE_PAD = 130
+const EDGE_PAD = 240
 const CARD_ROW_GAP = 6
 const MIN_CANVAS_H = 460
 /** Thickness of the timeline rail the chains hang from. */
@@ -109,16 +110,22 @@ export function TimelineWorkspace({
   const clampGap = (avail: number, first: number) =>
     Math.round(Math.min(120, Math.max(GAP_FLOOR, (avail - nodeH - first) / 2)))
 
-  // Both chains are drawn from the moment the page loads: they are the point of
-  // the product, not a detail to be opened. Sizing is therefore budgeted for
-  // three levels on each side of the rail at once.
+  // One chain is open at a time, so only its side of the rail is budgeted for
+  // three levels; the other needs room for a tag. That is what keeps a whole
+  // chain inside the viewport instead of running off the bottom.
+  const openAbove = focusChain?.direction === 'above'
+  const openBelow = focusChain?.direction === 'below'
+
   const gapAbove = clampGap(frameH / 2 - cardBandH - (compact ? 34 : 42), FIRST_ABOVE)
-  const aboveNeed =
-    cardBandH + 18 + FIRST_ABOVE + 2 * gapAbove + nodeH / 2 + (compact ? 18 : 24)
+  const aboveNeed = openAbove
+    ? cardBandH + 18 + FIRST_ABOVE + 2 * gapAbove + nodeH / 2 + (compact ? 18 : 24)
+    : cardBandH + 18 + ENTRY_DROP + ENTRY_H + 24
 
   const axisY = Math.max(Math.round(frameH / 2), Math.round(aboveNeed))
   const gapBelow = clampGap(Math.max(frameH, axisY + 190) - axisY - 42, FIRST_BELOW)
-  const belowNeed = FIRST_BELOW + 2 * gapBelow + nodeH / 2 + (compact ? 26 : 34)
+  const belowNeed = openBelow
+    ? FIRST_BELOW + 2 * gapBelow + nodeH / 2 + (compact ? 26 : 34)
+    : FIRST_BELOW + ENTRY_DROP + ENTRY_H + 26
   const canvasH = Math.max(frameH, Math.round(axisY + belowNeed))
 
   const cardTop = (row: number) => axisY - 20 - (row + 1) * (cardH + CARD_ROW_GAP)
@@ -135,16 +142,15 @@ export function TimelineWorkspace({
     return { anchorX, anchorY: axisY - cardBandH - 20, dir: -1 as const }
   }
 
-  const layouts = useMemo(
-    () =>
-      ws.chains.map((chain) => {
-        const { anchorX, anchorY, dir } = anchorFor(chain)
-        return { chain, layout: layoutChain(chain, anchorX, anchorY, dir, false, metricsFor(dir)) }
-      }),
+  const focusLayout = useMemo(() => {
+    if (!focusChain) return null
+    const { anchorX, anchorY, dir } = anchorFor(focusChain)
+    return {
+      chain: focusChain,
+      layout: layoutChain(focusChain, anchorX, anchorY, dir, false, metricsFor(dir)),
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ws.chains, ws.events, axisY, cardBandH, gapAbove, gapBelow, nodeH, FIRST_BELOW],
-  )
-  const focusLayout = layouts.find((l) => l.chain.id === openChainId) ?? null
+  }, [focusChain, ws.events, axisY, cardBandH, gapAbove, gapBelow, nodeH, FIRST_BELOW])
 
   useEffect(() => {
     if (didCenter.current || !scrollRef.current) return
@@ -303,11 +309,18 @@ export function TimelineWorkspace({
               <CashComparison scenario={ws.scenario} x={x} top={axisY + RAIL_H / 2 + bandTop} />
             )}
 
-            {layouts.map(({ chain, layout }) => (
-              <g key={chain.id} opacity={focusChain && focusChain.id !== chain.id ? 0.45 : 1}>
-                <ChainStrand layout={layout} />
-              </g>
-            ))}
+            {/* stubs of chain marking where a closed chain hangs */}
+            {ws.chains.filter((c) => c.id !== openChainId).map((c) => {
+              const { anchorX, dir } = anchorFor(c)
+              const from = dir === 1 ? axisY : axisY - cardBandH - 18
+              return (
+                <line key={`stub-${c.id}`} x1={anchorX} y1={from} x2={anchorX}
+                  y2={from + dir * ENTRY_DROP} stroke="#b9a48c" strokeWidth={2.4}
+                  strokeDasharray="1.4 5.5" strokeLinecap="round" opacity={0.9} />
+              )
+            })}
+
+            {focusLayout && <ChainStrand layout={focusLayout.layout} />}
           </svg>
 
           <div className="absolute z-20 -translate-x-1/2 rounded-full border border-[#c8d9f7] bg-white px-3 py-1 shadow-sm"
@@ -338,36 +351,38 @@ export function TimelineWorkspace({
               selected={selectedEventId === event.id} onSelect={onSelectEvent} />
           ))}
 
-          {layouts.map(({ chain, layout }) => {
-            const dimmed = !!focusChain && focusChain.id !== chain.id
+          {/* closed chains: one tag each */}
+          {ws.chains.filter((c) => c.id !== openChainId).map((c) => {
+            const { anchorX, dir } = anchorFor(c)
+            const from = dir === 1 ? axisY : axisY - cardBandH - 18
             return (
-              <div key={chain.id}>
-                <button
-                  type="button"
-                  onClick={() => onToggleChain(chain.id)}
-                  aria-pressed={focusChain?.id === chain.id}
-                  className={`absolute z-10 -translate-x-1/2 whitespace-nowrap rounded-full border px-2.5 py-[3px] text-[10.5px] font-medium transition-opacity ${
-                    focusChain?.id === chain.id
-                      ? 'border-[#c8d9f7] bg-[#eef4ff] text-[#26457f]'
-                      : 'border-hair bg-white text-muted hover:border-[#c8d9f7] hover:text-ink'
-                  } ${dimmed ? 'opacity-70' : ''}`}
-                  style={{
-                    left: (layout.minX + layout.maxX) / 2,
-                    top: chain.direction === 'below'
-                      ? layout.maxY + 8
-                      : Math.max(2, layout.minY - 22),
-                  }}
-                >
-                  {chain.title} · {chain.nodes.length} steps
-                </button>
-                {layout.levels.map((lv) => (
-                  <ChainNodeCard key={lv.node.id} node={lv.node} x={lv.nodeX} y={lv.y} h={nodeH}
-                    selected={selectedNodeId === lv.node.id} dimmed={dimmed}
-                    onSelect={onSelectNode} />
-                ))}
-              </div>
+              <ChainEntry key={c.id} chain={c} x={anchorX} y={from + dir * ENTRY_DROP}
+                dir={dir} active={false} onOpen={onToggleChain} />
             )
           })}
+
+          {/* the open chain, with a way to put it away again */}
+          {focusLayout && (
+            <div>
+              <button
+                type="button"
+                onClick={() => onToggleChain(focusLayout.chain.id)}
+                className="absolute z-10 -translate-x-1/2 whitespace-nowrap rounded-full border border-[#c8d9f7] bg-[#eef4ff] px-3 py-[4px] text-[11px] font-medium text-[#26457f]"
+                style={{
+                  left: (focusLayout.layout.minX + focusLayout.layout.maxX) / 2,
+                  top: focusLayout.chain.direction === 'below'
+                    ? focusLayout.layout.maxY + 10
+                    : Math.max(2, focusLayout.layout.minY - 26),
+                }}
+              >
+                {focusLayout.chain.title} · close
+              </button>
+              {focusLayout.layout.levels.map((lv) => (
+                <ChainNodeCard key={lv.node.id} node={lv.node} x={lv.nodeX} y={lv.y} h={nodeH}
+                  selected={selectedNodeId === lv.node.id} onSelect={onSelectNode} />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -1,19 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { OutlookLine, ScenarioRequest, WorkspaceResponse } from './types/contracts'
+import type { BriefingAction, ScenarioRequest, WorkspaceResponse } from './types/contracts'
 import { api } from './lib/api'
 import { TimelineWorkspace } from './components/TimelineWorkspace'
 import { NodeDrawer } from './components/NodeDrawer'
 import { EventDrawer } from './components/EventDrawer'
-import { OutlookBar } from './components/OutlookBar'
+import { BriefingBar } from './components/BriefingBar'
+import { PurchaseSheet } from './components/PurchaseSheet'
 import { ScenarioSheet } from './components/ScenarioSheet'
 import { AskSheet } from './components/AskSheet'
 import { DataSheet } from './components/DataSheet'
-import { CashComparisonHeadline } from './components/CashComparison'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
 const EMPTY: ScenarioRequest = { payoutDelayDays: 0, proposal: null, assumptions: null }
 
-type SheetKind = 'scenario' | 'ask' | 'data' | null
+type SheetKind = 'scenario' | 'ask' | 'data' | 'purchase' | null
 
 export default function App() {
   const [ws, setWs] = useState<WorkspaceResponse | null>(null)
@@ -24,6 +24,7 @@ export default function App() {
   const [eventId, setEventId] = useState<string | null>(null)
   const [openChainId, setOpenChainId] = useState<string | null>(null)
   const [sheet, setSheet] = useState<SheetKind>(null)
+  const [askSeed, setAskSeed] = useState<string | undefined>()
   const seq = useRef(0)
 
   const run = useCallback(async (req: ScenarioRequest) => {
@@ -90,20 +91,20 @@ export default function App() {
     setEventId(null)
   }, [])
 
-  const exploreDelay = useCallback(
-    (line: OutlookLine) => {
-      if (line.scenarioDelayDays) {
-        applyScenario({ ...scenario, payoutDelayDays: line.scenarioDelayDays })
-      }
-      if (line.focusNodeId) {
-        const chain = ws?.chains.find((c) => c.nodes.some((n) => n.id === line.focusNodeId))
-        if (chain) setOpenChainId(chain.id)
-        setEventId(null)
-        setNodeId(line.focusNodeId)
-      }
-    },
-    [applyScenario, scenario, ws],
-  )
+  // "See why" is the teaching moment: it opens the chain the briefing was
+  // talking about and reveals its first step, so the owner learns what the
+  // chains are for by using one.
+  const seeWhy = useCallback((a: BriefingAction) => {
+    setSheet(null)
+    if (a.chainId) setOpenChainId(a.chainId)
+    setEventId(null)
+    if (a.nodeId) setNodeId(a.nodeId)
+  }, [])
+
+  const askWith = useCallback((question: string) => {
+    setAskSeed(question)
+    setSheet('ask')
+  }, [])
 
   const node = useMemo(() => {
     if (!ws || !nodeId) return null
@@ -147,8 +148,6 @@ export default function App() {
     )
   }
 
-  const changed = scenario.payoutDelayDays !== 0 || !!scenario.proposal || !!scenario.assumptions
-
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex shrink-0 items-center gap-3 border-b border-hair bg-white px-6 py-2">
@@ -164,15 +163,13 @@ export default function App() {
 
         <div className="ml-auto flex items-center gap-2">
           {busy && <span className="text-[11.5px] italic text-muted">recomputing…</span>}
-          {changed && (
-            <button
-              type="button"
-              onClick={reset}
-              className="rounded-md border border-[#e6c7ae] bg-[#fdf3ec] px-2.5 py-1 text-[11.5px] font-medium text-[#8a4a1f]"
-            >
-              Back to current plan
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setSheet('scenario')}
+            className="rounded-md border border-hair px-2.5 py-1 text-[11.5px] text-[#3d4757] hover:border-[#c8d9f7]"
+          >
+            Try a scenario
+          </button>
           <button
             type="button"
             onClick={() => setSheet('data')}
@@ -183,15 +180,14 @@ export default function App() {
         </div>
       </header>
 
-      <OutlookBar
-        outlook={ws.outlook}
+      <BriefingBar
+        briefing={ws.briefing}
         busy={busy}
-        onExploreDelay={exploreDelay}
-        onAsk={() => setSheet('ask')}
-        onScenario={() => setSheet('scenario')}
+        onSeeWhy={seeWhy}
+        onCheckPurchase={() => setSheet('purchase')}
+        onAsk={askWith}
+        onReset={reset}
       />
-
-      <CashComparisonHeadline ws={ws} scenario={scenario} onChange={applyScenario} />
 
       {error && (
         <p className="shrink-0 bg-[#fdf3ec] px-6 py-1.5 text-[11.5px] text-[#8a4a1f]">{error}</p>
@@ -244,7 +240,25 @@ export default function App() {
           <AskSheet
             ws={ws}
             scenario={scenario}
+            initialQuestion={askSeed}
             onApplyScenario={applyScenario}
+            onClose={() => {
+              setSheet(null)
+              setAskSeed(undefined)
+            }}
+          />
+        )}
+        {sheet === 'purchase' && (
+          <PurchaseSheet
+            ws={ws}
+            scenario={scenario}
+            busy={busy}
+            onRun={applyScenario}
+            onReset={() => {
+              reset()
+              setSheet(null)
+            }}
+            onInspect={() => setSheet(null)}
             onClose={() => setSheet(null)}
           />
         )}

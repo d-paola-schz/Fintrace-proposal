@@ -7,11 +7,25 @@ import { Chat } from './Chat'
 import { Section } from './Section'
 import { ProvenanceChip, TONE_STYLE, ToneMark } from './Tone'
 
+/**
+ * Where the figure came from. This must follow the claim's provenance, not the
+ * node's status: an "observed" node can rest on a modelled assumption, and
+ * calling that "recorded in the data" would be false.
+ */
+const ORIGIN_MEANING: Record<string, string> = {
+  olist_historical: 'Recorded in the marketplace data.',
+  nessie_sandbox: 'From the sandbox bank records.',
+  derived: 'Calculated by Preflight from the figures behind it.',
+  user_entered: 'A figure you entered.',
+  demo_assumption: 'A modelled assumption for this demonstration, not a record.',
+}
+
+/** What kind of statement the step is making. */
 const STATUS_MEANING: Record<string, string> = {
-  observed: 'This is recorded in the data.',
-  inferred: 'Worked out from the records.',
-  possible: 'A conditional outcome — it has not happened.',
-  action: 'Something you could choose to do.',
+  observed: 'Observed',
+  inferred: 'Worked out from the records',
+  possible: 'Conditional — it has not happened',
+  action: 'Something you could choose to do',
 }
 
 /**
@@ -130,9 +144,14 @@ export function NodeDrawer({
               {impact.display}
             </p>
             <p className="mt-0.5 text-[11.5px] text-muted">{impact.label}</p>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
               <ProvenanceChip provenance={impact.provenance} />
-              <span className="text-[10.5px] text-muted">{STATUS_MEANING[node.status]}</span>
+              <span className="text-[10.5px] text-muted">
+                {ORIGIN_MEANING[impact.provenance] ?? ''}
+              </span>
+              <span className="text-[10.5px] text-muted">
+                · {STATUS_MEANING[node.status]}
+              </span>
             </div>
           </div>
         )}

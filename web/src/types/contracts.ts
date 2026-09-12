@@ -271,6 +271,24 @@ export interface OutlookLine {
   scenarioDelayDays?: number
 }
 
+export interface BriefingAction {
+  label: string
+  kind: 'see_why' | 'check_purchase'
+  eventId?: string
+  chainId?: string
+  nodeId?: string
+}
+
+export interface Briefing {
+  mode: 'plan' | 'scenario'
+  status: 'on_track' | 'at_risk'
+  lead: string
+  detail: string
+  watch?: string
+  scenarioLabel?: string
+  seeWhy?: BriefingAction
+}
+
 export interface Outlook {
   headline: string
   status: 'on_track' | 'at_risk'
@@ -295,6 +313,7 @@ export interface WorkspaceResponse {
   windowEnd: string
   events: FinancialEvent[]
   chains: Chain[]
+  briefing: Briefing
   outlook: Outlook
   scenario: ScenarioResult
   assumptions: Assumption[]
@@ -319,6 +338,8 @@ export interface ChatResponse {
   sourceRefs: string[]
   claims: Claim[]
   missingInputs?: MissingInput[]
+  /** Whatever the question supplied, so the form asks only for the rest. */
+  partialProposal?: ProposedDecision
   proposedChange?: ScenarioRequest
   proposalNote?: string
   unavailable?: string

@@ -367,6 +367,37 @@ type OutlookLine struct {
 	ScenarioDelayDays int `json:"scenarioDelayDays,omitempty"`
 }
 
+// BriefingAction is a next step the owner can actually take, with everything
+// the client needs to carry them to the right place on the timeline.
+type BriefingAction struct {
+	Label   string `json:"label"`
+	Kind    string `json:"kind"` // see_why | check_purchase
+	EventID string `json:"eventId,omitempty"`
+	ChainID string `json:"chainId,omitempty"`
+	NodeID  string `json:"nodeId,omitempty"`
+}
+
+// Briefing is what the owner reads first: three short sentences in the order a
+// consultant would say them — can you cover what is coming, by how much, and
+// what could change it — followed by the one thing to click.
+//
+// It is deliberately not a provenance report. The figures are the engine's, and
+// the sources stay one click away rather than on the opening screen.
+type Briefing struct {
+	Mode   string `json:"mode"`   // plan | scenario
+	Status string `json:"status"` // on_track | at_risk
+	// Lead answers "can I cover what is coming?" in one clause.
+	Lead string `json:"lead"`
+	// Detail carries the numbers: the low, its date, and the reserve standing.
+	Detail string `json:"detail"`
+	// Watch names the main thing that could change the answer. It is always
+	// phrased as a possibility, never as something that has happened.
+	Watch string `json:"watch,omitempty"`
+	// ScenarioLabel is set only while a what-if is being shown.
+	ScenarioLabel string          `json:"scenarioLabel,omitempty"`
+	SeeWhy        *BriefingAction `json:"seeWhy,omitempty"`
+}
+
 // Outlook is the first thing the owner reads: where the plan stands, and
 // separately, what could change it.
 type Outlook struct {
@@ -376,6 +407,14 @@ type Outlook struct {
 	// Conditional is absent when nothing within the tested range changes the
 	// answer. It is never merged into Plan.
 	Conditional *OutlookLine `json:"conditional,omitempty"`
+}
+
+// Mode reports whether this result describes the modelled plan or a what-if.
+func (r ScenarioResult) Mode() string {
+	if r.ScenarioActive {
+		return "scenario"
+	}
+	return "plan"
 }
 
 // WorkspaceResponse is the initial payload for the workspace.
@@ -392,6 +431,7 @@ type WorkspaceResponse struct {
 	Assumptions     []Assumption     `json:"assumptions"`
 	Sources         []SourceRecord   `json:"sources"`
 	SourceStatus    []SourceStatus   `json:"sourceStatus"`
+	Briefing        Briefing         `json:"briefing"`
 	Outlook         Outlook          `json:"outlook"`
 	Alert           *WorkspaceAlert  `json:"alert,omitempty"`
 	DataNotice      string           `json:"dataNotice"`
@@ -426,16 +466,19 @@ type ChatRequest struct {
 // ChatResponse carries a short answer plus resolvable citations, or an explicit
 // unavailable/missing-input state. It never contains model-invented figures.
 type ChatResponse struct {
-	OK             bool             `json:"ok"`
-	Intent         string           `json:"intent"`
-	Answer         string           `json:"answer"`
-	AnswerSource   string           `json:"answerSource"` // model | engine_fallback | unavailable
-	SourceRefs     []string         `json:"sourceRefs"`
-	Claims         []Claim          `json:"claims"`
-	MissingInputs  []MissingInput   `json:"missingInputs,omitempty"`
-	ProposedChange *ScenarioRequest `json:"proposedChange,omitempty"`
-	ProposalNote   string           `json:"proposalNote,omitempty"`
-	Unavailable    string           `json:"unavailable,omitempty"`
+	OK            bool           `json:"ok"`
+	Intent        string         `json:"intent"`
+	Answer        string         `json:"answer"`
+	AnswerSource  string         `json:"answerSource"` // model | engine_fallback | unavailable
+	SourceRefs    []string       `json:"sourceRefs"`
+	Claims        []Claim        `json:"claims"`
+	MissingInputs []MissingInput `json:"missingInputs,omitempty"`
+	// PartialProposal carries whatever the question did supply, so the client
+	// can ask only for what is genuinely missing instead of starting over.
+	PartialProposal *ProposedDecision `json:"partialProposal,omitempty"`
+	ProposedChange  *ScenarioRequest  `json:"proposedChange,omitempty"`
+	ProposalNote    string            `json:"proposalNote,omitempty"`
+	Unavailable     string            `json:"unavailable,omitempty"`
 }
 
 // Discovery is one thing the language model proposed looking at, after the Go

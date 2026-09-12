@@ -124,3 +124,73 @@ func TestTheRealPlanIsAlwaysAvailableBesideAScenario(t *testing.T) {
 		t.Error("with nothing applied there is no scenario to be active")
 	}
 }
+
+// The briefing is the first thing anyone reads, so it must describe the
+// modelled plan by default and never present a hypothetical as something that
+// has happened.
+func TestBriefingOpensOnThePlanAndNeverAssertsAHypothetical(t *testing.T) {
+	b := testBuilder(t)
+
+	t.Run("default is the plan, with the risk as a possibility", func(t *testing.T) {
+		br := b.Build(contracts.ScenarioRequest{}).Briefing
+		if br.Mode != "plan" {
+			t.Fatalf("mode = %q, want plan", br.Mode)
+		}
+		if br.ScenarioLabel != "" {
+			t.Errorf("no what-if is active, so there must be no scenario label: %q",
+				br.ScenarioLabel)
+		}
+		if br.Lead == "" || br.Detail == "" {
+			t.Fatal("the briefing needs a lead and a detail sentence")
+		}
+		if br.Watch != "" && !strings.Contains(br.Watch, "could") {
+			t.Errorf("the risk must be a possibility, not an event: %q", br.Watch)
+		}
+		// Never claim the modelled plan is the owner's real position.
+		joined := br.Lead + " " + br.Detail + " " + br.Watch
+		for _, forbidden := range []string{"actual plan", "has arrived", "was delayed", "your real"} {
+			if strings.Contains(strings.ToLower(joined), forbidden) {
+				t.Errorf("briefing says %q: %s", forbidden, joined)
+			}
+		}
+		if br.SeeWhy == nil || br.SeeWhy.NodeID == "" || br.SeeWhy.ChainID == "" {
+			t.Fatalf("See why must point at a specific chain step, got %+v", br.SeeWhy)
+		}
+	})
+
+	t.Run("a what-if announces itself", func(t *testing.T) {
+		br := b.Build(contracts.ScenarioRequest{PayoutDelayDays: 5}).Briefing
+		if br.Mode != "scenario" {
+			t.Fatalf("mode = %q, want scenario", br.Mode)
+		}
+		if !strings.HasPrefix(br.ScenarioLabel, "What-if") {
+			t.Errorf("scenario label must announce itself: %q", br.ScenarioLabel)
+		}
+		if !strings.Contains(br.Lead, "would") {
+			t.Errorf("a hypothetical outcome must be conditional: %q", br.Lead)
+		}
+		if !strings.Contains(br.Watch, "has been applied") {
+			t.Errorf("a what-if must say it is not applied: %q", br.Watch)
+		}
+	})
+
+	t.Run("See why points at a step that exists", func(t *testing.T) {
+		ws := b.Build(contracts.ScenarioRequest{})
+		a := ws.Briefing.SeeWhy
+		var found bool
+		for _, c := range ws.Chains {
+			if c.ID != a.ChainID {
+				continue
+			}
+			for _, n := range c.Nodes {
+				if n.ID == a.NodeID && n.Sequence == 1 {
+					found = true
+				}
+			}
+		}
+		if !found {
+			t.Fatalf("See why targets %s/%s, which is not the first step of a real chain",
+				a.ChainID, a.NodeID)
+		}
+	})
+}

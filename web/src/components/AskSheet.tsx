@@ -14,11 +14,13 @@ export function AskSheet({
   scenario,
   onApplyScenario,
   onClose,
+  initialQuestion,
 }: {
   ws: WorkspaceResponse
   scenario: ScenarioRequest
   onApplyScenario: (req: ScenarioRequest) => void
   onClose: () => void
+  initialQuestion?: string
 }) {
   return (
     <Sheet
@@ -27,6 +29,7 @@ export function AskSheet({
       onClose={onClose}
     >
       <Chat
+        initialQuestion={initialQuestion}
         scenario={scenario}
         placeholder="Ask anything about your cash…"
         suggestions={[
