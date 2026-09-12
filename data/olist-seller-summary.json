@@ -1,0 +1,1440 @@
+{
+  "dataVersion": "olist-seller-v1",
+  "currency": "BRL",
+  "dataset": {
+    "name": "Brazilian E-Commerce Public Dataset by Olist (Kaggle, CC BY-NC-SA 4.0)",
+    "retrievedFrom": "https://github.com/MMBazel/Kaggle-Brazilian-Ecommerce-Prediction/tree/main/data/raw",
+    "note": "Public mirror of the Kaggle release. Row counts were checked against the published dataset before use.",
+    "files": {
+      "order_items": {
+        "file": "olist_order_items_dataset.csv",
+        "sha256": "0bc4d068c4fe38cbb01bd90e8746e3c613fe7b4baef75fab7b0e329701c3e279",
+        "rows": 112650
+      },
+      "orders": {
+        "file": "olist_orders_dataset.csv",
+        "sha256": "8df58ef3d2d7e9944010f7beecd9b75367f5588ec6e3c91cec19ae3345ef9ecf",
+        "rows": 99441
+      },
+      "products": {
+        "file": "olist_products_dataset.csv",
+        "sha256": "3e6569628a17fbc75fd206ee357b59e20364b9afa90f5b6cd5b4d624c58aa9cc",
+        "rows": 32951
+      },
+      "sellers": {
+        "file": "olist_sellers_dataset.csv",
+        "sha256": "1f643d2b950373b85735e7794b20986f528d7a000432e7c6f9bcbb44d0846a0e",
+        "rows": 3095
+      }
+    }
+  },
+  "sellerSelection": {
+    "selectedSellerId": "955fee9216a65b617aa5c0531780ce60",
+    "specifiedSellerId": "3442f8959a84dea7ee197c632cb2df15",
+    "substituted": true,
+    "reason": "The seller named in the brief has only 3 order item(s) across 3 order(s) (2017-05-05 to 2017-08-30), which cannot support a 30-day cash demonstration. The substitute was chosen for order volume, continuous date coverage and product-category variety.",
+    "specifiedSellerStats": {
+      "itemCount": 3,
+      "orderCount": 3,
+      "firstDate": "2017-05-05",
+      "lastDate": "2017-08-30"
+    }
+  },
+  "seller": {
+    "sellerId": "955fee9216a65b617aa5c0531780ce60",
+    "city": "sao paulo",
+    "state": "SP",
+    "itemCount": 1498,
+    "orderCount": 1286,
+    "distinctProducts": 104,
+    "firstSaleDate": "2017-07-24",
+    "lastSaleDate": "2018-08-28",
+    "itemRevenueCents": 13515970,
+    "categoryCount": 23,
+    "categories": [
+      {
+        "name": "moveis_decoracao",
+        "itemCount": 535,
+        "itemRevenueCents": 3886890
+      },
+      {
+        "name": "utilidades_domesticas",
+        "itemCount": 242,
+        "itemRevenueCents": 3084400
+      },
+      {
+        "name": "esporte_lazer",
+        "itemCount": 136,
+        "itemRevenueCents": 1586589
+      },
+      {
+        "name": "beleza_saude",
+        "itemCount": 118,
+        "itemRevenueCents": 1196760
+      },
+      {
+        "name": "cool_stuff",
+        "itemCount": 115,
+        "itemRevenueCents": 401250
+      },
+      {
+        "name": "ferramentas_jardim",
+        "itemCount": 65,
+        "itemRevenueCents": 1032193
+      },
+      {
+        "name": "construcao_ferramentas_iluminacao",
+        "itemCount": 57,
+        "itemRevenueCents": 232893
+      },
+      {
+        "name": "papelaria",
+        "itemCount": 49,
+        "itemRevenueCents": 250174
+      },
+      {
+        "name": "industria_comercio_e_negocios",
+        "itemCount": 33,
+        "itemRevenueCents": 376000
+      },
+      {
+        "name": "instrumentos_musicais",
+        "itemCount": 24,
+        "itemRevenueCents": 222000
+      }
+    ]
+  },
+  "window": {
+    "start": "2018-05-02",
+    "end": "2018-05-31",
+    "itemCount": 247,
+    "orderCount": 189,
+    "itemRevenueCents": 2634180
+  },
+  "priorWindow": {
+    "start": "2018-04-02",
+    "end": "2018-05-01",
+    "itemCount": 247,
+    "orderCount": 213,
+    "itemRevenueCents": 2325340
+  },
+  "dailyRange": {
+    "start": "2018-03-03",
+    "end": "2018-05-31"
+  },
+  "windowSelection": {
+    "anchorDate": "2018-05-31",
+    "chosenBy": "presentation",
+    "disclosure": "The 30-day demo window ends 2018-05-31, the close of this seller's highest-activity month. The seller's full recorded history (2017-07-24 to 2018-08-28) is summarised in the same file; its last months were quieter than the window shown."
+  },
+  "dailySales": [
+    {
+      "date": "2018-03-03",
+      "itemCount": 7,
+      "orderCount": 7,
+      "itemRevenueCents": 44980,
+      "orderIds": [
+        "02b7cbd604df10c09427902dc682b0d3",
+        "6c9841106812441f8d244c22b9d07ba3",
+        "7786642062339870927e5c0dd845985c",
+        "7958d9e7f3083099780539e0054d0c54",
+        "8046235d64b3479dfce835281a85c0d6",
+        "93a804dadb1564950a0aa38cfb23def6"
+      ],
+      "orderIdsTruncated": true
+    },
+    {
+      "date": "2018-03-04",
+      "itemCount": 5,
+      "orderCount": 5,
+      "itemRevenueCents": 46870,
+      "orderIds": [
+        "008c3a655c66f4d92370d0d422732f69",
+        "15e12d9cfb0958b1edd456f8ff11fcc8",
+        "2942de5b4c34fa90c38954a9e86f7fcd",
+        "f50e6fe960b68d2b8510cc0cef8ed8dc",
+        "feec317d7127a4dc69cfb507f08c8759"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-03-05",
+      "itemCount": 11,
+      "orderCount": 9,
+      "itemRevenueCents": 78880,
+      "orderIds": [
+        "182249661a8adda147e800e137d02999",
+        "682d2a1eb8b2676fc3337cf90c96ca8b",
+        "690e357ce3c40a04f820fe9d3142b3e5",
+        "7428195653ad7e05d37c801977ea152b",
+        "8394de68d323384a331279fd8a60462e",
+        "9f94d18d96cdee37300256e7284d7de9"
+      ],
+      "orderIdsTruncated": true
+    },
+    {
+      "date": "2018-03-06",
+      "itemCount": 6,
+      "orderCount": 6,
+      "itemRevenueCents": 78970,
+      "orderIds": [
+        "017b1d6881222283afdc50baf3dcb0d5",
+        "3ad7eae98c8f120f7a4e4cc64f4278e9",
+        "4b47ca7c3201379f99ee4c1f4d0c80b0",
+        "60083e3e8bf6182f3fb99b7a19203f45",
+        "87d093c6d324b6721093e4582b061cf2",
+        "91038108554d2455d744ce8eb0a0ff35"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-03-07",
+      "itemCount": 5,
+      "orderCount": 5,
+      "itemRevenueCents": 61990,
+      "orderIds": [
+        "38f20047d0076f9e934f642326bd61f8",
+        "8469b1387861c507e8e01dcb28b0dfa4",
+        "a4bc6ee8a0b10b9362660438b786cdaf",
+        "d6cb7abec3164d194483906f3702748a",
+        "ec72beff33dc025a12ecdb790a99f730"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-03-08",
+      "itemCount": 3,
+      "orderCount": 2,
+      "itemRevenueCents": 20970,
+      "orderIds": [
+        "9d241238f3827aced623154ace551dd9",
+        "c12a78eb30abe88570f3c2c79bea1334"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-03-09",
+      "itemCount": 6,
+      "orderCount": 6,
+      "itemRevenueCents": 29170,
+      "orderIds": [
+        "025830a006d984bf712a8c6a1eca41c0",
+        "86e808220bf5a6f24b942ef7108644be",
+        "8b1f6a9fcd45ffc05a994c5a4b0a8a9d",
+        "c103d6905dc7e83d02a0f86e5a0ba4bb",
+        "d17cef1f461b1a777ffe306534d10b02",
+        "dee55178829a36ebb42b7a3aba84c244"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-03-10",
+      "itemCount": 4,
+      "orderCount": 3,
+      "itemRevenueCents": 21980,
+      "orderIds": [
+        "4fc7fe1bc9c28e87c8d77a28aefb97f4",
+        "88860d93217b743a342d87689e17bdbd",
+        "ef39e8a01edeec8664b6fa8ebc5f3b9f"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-03-11",
+      "itemCount": 4,
+      "orderCount": 4,
+      "itemRevenueCents": 30489,
+      "orderIds": [
+        "0e717e310af82d130a1d253cd5fe8c7c",
+        "23b0f3febe2a61dfb83ff0ede848d53e",
+        "a6c4a396b90e2d6bbb30aec21e1c20f8",
+        "ac88d96f79bb0884df747b9c38fe48f7"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-03-12",
+      "itemCount": 3,
+      "orderCount": 3,
+      "itemRevenueCents": 42989,
+      "orderIds": [
+        "0a2c8538b97333899a075ae94b85b037",
+        "895760450a7b9a0a42ec7a8f5b19730f",
+        "992896ae125eab618e4959e3ea83dc8c"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-03-13",
+      "itemCount": 3,
+      "orderCount": 3,
+      "itemRevenueCents": 16498,
+      "orderIds": [
+        "614a942e991f27cc67f45c0b0ca5470d",
+        "9c31d604522ef4fd8e0bba68aa3214a1",
+        "e7cf06bc6a8ae92d204e156e702fd227"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-03-14",
+      "itemCount": 2,
+      "orderCount": 2,
+      "itemRevenueCents": 13950,
+      "orderIds": [
+        "0aa31b21d8142ae99420dec2c667e869",
+        "b92b69bbda4e9c56848904c3f0cc14d9"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-03-15",
+      "itemCount": 6,
+      "orderCount": 5,
+      "itemRevenueCents": 44580,
+      "orderIds": [
+        "70eaa52116958c2e734172d6ed51015e",
+        "9b4ce65d237bc82227e4b550d1ddf079",
+        "b675c85f6d0f5171914694e00382548d",
+        "b9d5bea267e1dd6838786cc12ba40ceb",
+        "d28f2bc60aaf4da8d97ff1319fdffab4"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-03-16",
+      "itemCount": 1,
+      "orderCount": 1,
+      "itemRevenueCents": 3500,
+      "orderIds": [
+        "57c39a946fb5e8e626649f02732b7cd5"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-03-17",
+      "itemCount": 3,
+      "orderCount": 3,
+      "itemRevenueCents": 17480,
+      "orderIds": [
+        "8c2a426cd8a3c5fbe7d79b4696a5d20b",
+        "932fc6a48836dc75bc0b624817acc479",
+        "9d1780c1dba60f1e3fc99e1072979110"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-03-18",
+      "itemCount": 7,
+      "orderCount": 6,
+      "itemRevenueCents": 40200,
+      "orderIds": [
+        "075d1d2a3ac6d55e925dda5e2ad0c6fe",
+        "5c6f7bb0fd181620de8ef994024ef461",
+        "61d9b48d85b81cc207e948c13dbd633b",
+        "c08f913d8edeabde7839e5b6a953ecf3",
+        "ccd47f941a32fe69eb9609d89692bbbf",
+        "d8cdb1ec6e73dc6a9fcf2b7700afaf3c"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-03-19",
+      "itemCount": 12,
+      "orderCount": 12,
+      "itemRevenueCents": 103889,
+      "orderIds": [
+        "07ffab4def2a95548ff6ef1b9d7e0f5a",
+        "2043f9d91a5fa13a0b5aec806b6a4c27",
+        "20b9ddb6d4a3df0ea06f860c983662b8",
+        "2260cb2dc43ff44ab9b095424034c741",
+        "34fa4dce8775b3b4accea9779a4a6562",
+        "3d95793cfeffacca98e2027eb0e33dc4"
+      ],
+      "orderIdsTruncated": true
+    },
+    {
+      "date": "2018-03-20",
+      "itemCount": 6,
+      "orderCount": 5,
+      "itemRevenueCents": 54840,
+      "orderIds": [
+        "047ad2bad6fa4c12dd98ff4b00ce0317",
+        "08b7104ed7002c5ada9a6751b7a464da",
+        "29d213d4cf25b10351ee72f7456bec18",
+        "bd1b3292531bf8f2cf14a4f448b2226e",
+        "c1ee8750e81c5ea3177c055eb948a7c3"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-03-21",
+      "itemCount": 5,
+      "orderCount": 5,
+      "itemRevenueCents": 28970,
+      "orderIds": [
+        "18c3c1366ee83a4162a2eefe7bb66f23",
+        "5982fca4536769e5024e12eb8b6f473c",
+        "5f673b3f9980fdd744937e959c80dcbd",
+        "8ae8d8173866d2467bdd036f34c5a86b",
+        "af4de21fc01c7d4570f5bcbbb28cbd75"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-03-22",
+      "itemCount": 6,
+      "orderCount": 6,
+      "itemRevenueCents": 64930,
+      "orderIds": [
+        "52a36877de4e2af3ed6280b29d6e9ecb",
+        "7e95d101ed97603578e38b4955c244ab",
+        "9f2940e7c87aa56f8dab37ac0be23138",
+        "ee8efb0001f769a88ab6001e17de9e59",
+        "fb1d06cccaa9f157355d83d52634c957",
+        "fcb1e2586649d5835b9d01200905a76c"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-03-23",
+      "itemCount": 4,
+      "orderCount": 4,
+      "itemRevenueCents": 37480,
+      "orderIds": [
+        "044bcd01474ba715e7cb11d5a70ccf0e",
+        "15fb8208682172544e82b96aeb5229fa",
+        "8ff6ced519949488b47afc0e5af711f7",
+        "938110b6904380feefb719683295f04a"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-03-24",
+      "itemCount": 5,
+      "orderCount": 4,
+      "itemRevenueCents": 46960,
+      "orderIds": [
+        "455b543c53eb86970fe22cdb9890a686",
+        "6d1f5da238306b0008063ff2f93feac9",
+        "82cefc0ed05913e6d19b9d6283dbf9cf",
+        "d9e223f2fca6aee33e9374cd57b8d220"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-03-25",
+      "itemCount": 6,
+      "orderCount": 6,
+      "itemRevenueCents": 26480,
+      "orderIds": [
+        "4a02bc45b72b95ce8a16efd46f2e1e47",
+        "607ee697173850d7eb749c1fc01be313",
+        "78ffbacf7c5428a637e847e5191e4875",
+        "939b9bfbbe679418ac73646f380353ec",
+        "9b050477d0faef8e239f8ab69bac935a",
+        "be198c7ab23c5f91b691194386f3a132"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-03-26",
+      "itemCount": 10,
+      "orderCount": 10,
+      "itemRevenueCents": 114650,
+      "orderIds": [
+        "1ae76304686bb902dc30d60e5dbf9237",
+        "334ea0d577d6491e3b5ea4b5fdc76a75",
+        "3e0ff86919e2e005d7f1d59015edb415",
+        "4f9b6a9b3216925859301fc767b0fece",
+        "5c70dd56919e4ecb33f8d48067944b48",
+        "6b7eb46185e1e6f0df3c97ed2b16a563"
+      ],
+      "orderIdsTruncated": true
+    },
+    {
+      "date": "2018-03-27",
+      "itemCount": 5,
+      "orderCount": 4,
+      "itemRevenueCents": 109280,
+      "orderIds": [
+        "06d5cbe68295558fd6c48998db3ea397",
+        "6ac4c573549ec4d968907f982c4be7a5",
+        "a4da095fd83534c9f86f28e6f7eea0e5",
+        "d3643399509c4df2d897ac4321bd6339"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-03-28",
+      "itemCount": 5,
+      "orderCount": 5,
+      "itemRevenueCents": 33500,
+      "orderIds": [
+        "3ff1a97af462ca0dafa98d5914729e86",
+        "50a3da0c0ed16ef14182ca96382849cc",
+        "a92cfc44e62b26e5bda2aeb39b0e0217",
+        "db2557d3b3417e5746ab989f2e143860",
+        "e4137bb83c0ad1410a2c9efd9e87fc1a"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-03-29",
+      "itemCount": 3,
+      "orderCount": 3,
+      "itemRevenueCents": 57299,
+      "orderIds": [
+        "44c4ba0247b4e50ab9c03466cc15ea5c",
+        "89aa696d2bae84d88b2f855b0db40800",
+        "fc1095da158f0fc66f917a4f7a257183"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-03-30",
+      "itemCount": 4,
+      "orderCount": 4,
+      "itemRevenueCents": 30180,
+      "orderIds": [
+        "0ea1fd1eeeb46df9770ac9d07e1e71e6",
+        "a7d69ce9d8cad8e7d9b48cbdfe236bff",
+        "bc0d5d1faf5b015dc352b83463f205df",
+        "d3baa30209aa87ddd816648e62d16cc4"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-03-31",
+      "itemCount": 5,
+      "orderCount": 5,
+      "itemRevenueCents": 32890,
+      "orderIds": [
+        "292763c479eed9e980ac01583f89db93",
+        "ac16a498e09da326e763056460491b62",
+        "db4975029748a4fe3f218f5d62885918",
+        "e36c63ea06394d310e4b4ce9334c0392",
+        "eb909499d5b377c57b0af7ce0b005bb4"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-04-01",
+      "itemCount": 4,
+      "orderCount": 4,
+      "itemRevenueCents": 25970,
+      "orderIds": [
+        "3b403954bc51826b0abdd90bcf1e379a",
+        "a8a6ba331df6f7b1106abbc30489c428",
+        "d7f0913acbeab2d90a27f737d85a2d7a",
+        "ed7646bd67d7f803bfe1d24cc78cd827"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-04-02",
+      "itemCount": 10,
+      "orderCount": 8,
+      "itemRevenueCents": 96050,
+      "orderIds": [
+        "2ce188fdc7fb58e72c2adeedc6419827",
+        "3bfd863aeb764ee13e7a3909ca8be2a5",
+        "5f482802d2cfd506df0097347965687c",
+        "7032fb16c3a9d982c9aa86f47cefdd3e",
+        "9ee0fd6b317c26dddea4dc4347c8a82c",
+        "c1f89369bd3cbb73632fdaa0ccaea081"
+      ],
+      "orderIdsTruncated": true
+    },
+    {
+      "date": "2018-04-03",
+      "itemCount": 5,
+      "orderCount": 3,
+      "itemRevenueCents": 29970,
+      "orderIds": [
+        "3b71072f9d05c9bb81d0a43adf411715",
+        "57dc71776356b30418cf133f68678b44",
+        "665f27cd53c438276f8d03532bdaa047"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-04-04",
+      "itemCount": 4,
+      "orderCount": 3,
+      "itemRevenueCents": 27990,
+      "orderIds": [
+        "2975b6c860dbfdf97400ce6e3f2f17fa",
+        "a59b2ae7ce595ee0cb33191bbf75836c",
+        "a5bb508b158c65e99f596d0e8a2bc08d"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-04-05",
+      "itemCount": 13,
+      "orderCount": 8,
+      "itemRevenueCents": 137040,
+      "orderIds": [
+        "0759ac0ac1a0c11ab13fc66564f4e112",
+        "2776f1ccb5f02e632cfad6beddf14af8",
+        "2b0ea1bc126b4422086b85c125810819",
+        "8eadc079bd4cf0c38f40bf74468c47c7",
+        "91d4539b388eaa6cdb58342954c42c5a",
+        "acf579dc44e10bf23cabf01d80f9f62c"
+      ],
+      "orderIdsTruncated": true
+    },
+    {
+      "date": "2018-04-06",
+      "itemCount": 5,
+      "orderCount": 5,
+      "itemRevenueCents": 44190,
+      "orderIds": [
+        "0bbbb66c440b6ff7b34420eb273868ae",
+        "4130baec40bb0cf5872d8c322e6383d5",
+        "6dcb51857ca646a4809ea67184d43e46",
+        "723e240c9c7fab76e64b2c232afb8bd8",
+        "84e340f8ce26dd8b76b86f8d2c84debd"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-04-07",
+      "itemCount": 6,
+      "orderCount": 6,
+      "itemRevenueCents": 71970,
+      "orderIds": [
+        "1f668cb933ff919d9c0f22d752b4503a",
+        "3ac3c69a0647096dc7f014eea6749574",
+        "595c8cc7fe6bf40c3acfe06661759a4b",
+        "68d40cb0612e4d3be0f773cd162f8368",
+        "c284eb7adf76e92a2a39d845f1333a61",
+        "ecc34002d063638235d7519f53b1d4f9"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-04-08",
+      "itemCount": 5,
+      "orderCount": 5,
+      "itemRevenueCents": 38680,
+      "orderIds": [
+        "10ae81c09f8af0de80d11ebb50e272ec",
+        "38d33a629bb89c609344e7ef727bed13",
+        "805c5e08abb1db3756bd998d0aa90d3a",
+        "d2e6941d5f639394550cee8291b1ecef",
+        "eb91420251c7666f038332f5dad73962"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-04-09",
+      "itemCount": 7,
+      "orderCount": 6,
+      "itemRevenueCents": 59970,
+      "orderIds": [
+        "34fb24b31d9f7c52c22cc20e8c81449f",
+        "4bdaaba79beb58b6ac0b35bcc649693c",
+        "4f971c4ebb15cc7cc89db8cf3acd2b33",
+        "6726395519c13e15034fb6bfb4fcd904",
+        "ca290a06ee0945b956f79c93b5191633",
+        "e8995864e25d8b4a13a97f3f0e82f35f"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-04-10",
+      "itemCount": 4,
+      "orderCount": 4,
+      "itemRevenueCents": 27990,
+      "orderIds": [
+        "005997dca4c1fc45066d0a03d54a6469",
+        "383ba1470e3ace2021f232303b6d4097",
+        "73f48668570ed56f695a820d9fad1642",
+        "c764b50847f8a6b31dd92151b3680d94"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-04-11",
+      "itemCount": 6,
+      "orderCount": 6,
+      "itemRevenueCents": 30600,
+      "orderIds": [
+        "51b808ed0e75c3a1106b08d3afe4f655",
+        "5a559395babb637d7999a5716873d882",
+        "632531ed16e28e070dea1b54fc644fd4",
+        "9cb4982223168ae7d72cce4d255f4fd9",
+        "c01203d34db08658230babe21d2234c8",
+        "e670c857f8a70c9aacdf644c59980d17"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-04-12",
+      "itemCount": 5,
+      "orderCount": 5,
+      "itemRevenueCents": 47990,
+      "orderIds": [
+        "39bcd5ec1743f20b61498be2277d28db",
+        "3a4d0bd3463e22357c0b3ea55c2789a9",
+        "47999a7490ff2905f7ca3da2edcc9c52",
+        "8e0fcebda1a183b81c2349510bd90cb0",
+        "dce5d8be76c73098306a8f74b197fb6f"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-04-13",
+      "itemCount": 5,
+      "orderCount": 5,
+      "itemRevenueCents": 53290,
+      "orderIds": [
+        "41912407aa4f806e91639c89391eceef",
+        "4e53a913dfd522beb67229c2784dde5b",
+        "6f31debad3e2a2d5613bd6deb3a6ebbd",
+        "85daf7307b6fe2f3ed3cb569633b9f9a",
+        "99858c2ee75228a1cd8afbdaa5e37b7f"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-04-14",
+      "itemCount": 6,
+      "orderCount": 5,
+      "itemRevenueCents": 57890,
+      "orderIds": [
+        "4225edaa7ed111e8f866bb6e60e2152b",
+        "6632309d6179381a1a42c64867ffb19a",
+        "6afd8b64eabf9544f371b79bc6569bce",
+        "8976430d1df174a9bce201c4e859d921",
+        "f461365902fbac0de671877edd6649f1"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-04-15",
+      "itemCount": 3,
+      "orderCount": 3,
+      "itemRevenueCents": 22989,
+      "orderIds": [
+        "10f78992cb35d73641d587e75921cf7c",
+        "b6fbeeba8ce77342619aa0311aff42d3",
+        "d4ccce5bb74fa1b913fefb501f0d63b5"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-04-16",
+      "itemCount": 12,
+      "orderCount": 9,
+      "itemRevenueCents": 105240,
+      "orderIds": [
+        "0df82e7e73083762d11e4dce39a84c7f",
+        "0e7ce95d19235a4bed2b0bfd4e9111db",
+        "2ad674d5024f5e52836b96215eb73588",
+        "5d7ac6a387319785f60ff58860a82e7e",
+        "6d7de866a140b19d09e825b2a4e944c7",
+        "71364fd8f029fcfef871a2b7c1c45eef"
+      ],
+      "orderIdsTruncated": true
+    },
+    {
+      "date": "2018-04-17",
+      "itemCount": 9,
+      "orderCount": 8,
+      "itemRevenueCents": 60420,
+      "orderIds": [
+        "43ab73c0fdb75dcd4b4ef724da1541c0",
+        "4fc714d903314beff16d93bd2e75f612",
+        "526147ccc6d06def7a933904c19058c8",
+        "876e774339918c3047914ce3a4180489",
+        "8bf33d4b7023414545360548b0e2ee37",
+        "9c0267b5762b2d323cb9685eed1d5cfa"
+      ],
+      "orderIdsTruncated": true
+    },
+    {
+      "date": "2018-04-18",
+      "itemCount": 7,
+      "orderCount": 6,
+      "itemRevenueCents": 63960,
+      "orderIds": [
+        "11bd5b514c1e1b6a737ed2fd95489424",
+        "455a06b2c87c0974656c52d6f315d56e",
+        "66eb8c748be99c3107d318f370cd9aa2",
+        "6e522b46c78b3f2ba9e3b02f35b099de",
+        "c0e4be5f87879fd60a4ed1542a1c60bf",
+        "cdb18f3386ecc8f706baf2c9b3ba9034"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-04-19",
+      "itemCount": 12,
+      "orderCount": 12,
+      "itemRevenueCents": 174440,
+      "orderIds": [
+        "03fa4271f18542d22ecbb7eb41802ada",
+        "08921fc98ee1dc54454ae8af90493c44",
+        "185a17e610fa1a503abd98770d3eda4d",
+        "5f8c25407710ac05d9b793cb61ff00be",
+        "615e1dea1409a7cbeae7afc1bf75c305",
+        "a1702545bdfba19345c69fa098b15020"
+      ],
+      "orderIdsTruncated": true
+    },
+    {
+      "date": "2018-04-20",
+      "itemCount": 9,
+      "orderCount": 7,
+      "itemRevenueCents": 67078,
+      "orderIds": [
+        "131c6bd0b11c3fc93c3c8dbe45f317e6",
+        "2bf247ba0fa83d6f30b133c7dc349f3a",
+        "339063a819f93e6e25102c3bb66ab667",
+        "53a24a678d0e83d0d3c718528aa0aece",
+        "a52c52c656d3b3ef3ec72fcdc13c714f",
+        "b811c8ca07716586e80c0bc4f2a6e39f"
+      ],
+      "orderIdsTruncated": true
+    },
+    {
+      "date": "2018-04-21",
+      "itemCount": 4,
+      "orderCount": 4,
+      "itemRevenueCents": 32980,
+      "orderIds": [
+        "1190543041e25468b0370ddae215f01d",
+        "40a496e18a46349487b125eda0d0c288",
+        "b2f01d619b5557f295317bca57f07471",
+        "f201d0924f68c1eadbe0e527ae947481"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-04-22",
+      "itemCount": 7,
+      "orderCount": 7,
+      "itemRevenueCents": 42169,
+      "orderIds": [
+        "4d3fd3b2bf5c3adc542718183a646bac",
+        "785f211a578f2b593e6ecaa4db29fdfb",
+        "91adf7071ab8c2861356bb2f4dfae721",
+        "9a382d951dd3a73c696f80da02ea06a5",
+        "ee2c523648f8d3fddba9f09bc16a6490",
+        "f0fc730a1254996668db8e9161446323"
+      ],
+      "orderIdsTruncated": true
+    },
+    {
+      "date": "2018-04-23",
+      "itemCount": 7,
+      "orderCount": 7,
+      "itemRevenueCents": 49250,
+      "orderIds": [
+        "04105b54650921ca3246f52e6f175f46",
+        "51759d8321ae577fc2d577b976f8130f",
+        "886dd09169ed29010eb71d9faed92259",
+        "d748f1038851a92e7ccb2b2794a286eb",
+        "deb53c75e6fc731052963598e2553698",
+        "e892eede814b151cc44aa21a6ecd1200"
+      ],
+      "orderIdsTruncated": true
+    },
+    {
+      "date": "2018-04-24",
+      "itemCount": 8,
+      "orderCount": 8,
+      "itemRevenueCents": 97979,
+      "orderIds": [
+        "295925037780bbbf9d7a2294087693bc",
+        "78c0a28679d359bd04124988a2e04bac",
+        "8bdf9c1234f103cd24f42bbe538bcfeb",
+        "b3e9c25f3bb564b708bfaac8199cf13d",
+        "c2fe713d93a9f489de49d6a79eb7f45c",
+        "cb53cf5b28f49e1d2f166c5abe50c31c"
+      ],
+      "orderIdsTruncated": true
+    },
+    {
+      "date": "2018-04-25",
+      "itemCount": 13,
+      "orderCount": 11,
+      "itemRevenueCents": 147290,
+      "orderIds": [
+        "18b32669d9e5cbe2038b8080829a2c1f",
+        "3ab1c10e246de2d841791a3070053d7f",
+        "3b181504164d79cc0fe1188937fb3ce3",
+        "46200d71c536e9f7dc1491ae1189e206",
+        "5bb5e53b117f231e116d1ff1f530c8ce",
+        "620a716a1e6b0f533e5ffeee43cc55e9"
+      ],
+      "orderIdsTruncated": true
+    },
+    {
+      "date": "2018-04-26",
+      "itemCount": 15,
+      "orderCount": 13,
+      "itemRevenueCents": 133067,
+      "orderIds": [
+        "106b004da4aaa8f41d0115b6a7829a1a",
+        "5007ef2d1751857fb87921606c3c617f",
+        "67ff89e045f61cd73790e9866d3dc6ea",
+        "6b9ac2a31d647731d9523ae035f17dbc",
+        "6d4d21ff3677c130cd3c6937482487eb",
+        "75fc2d6227460881589d526e733e0499"
+      ],
+      "orderIdsTruncated": true
+    },
+    {
+      "date": "2018-04-27",
+      "itemCount": 24,
+      "orderCount": 15,
+      "itemRevenueCents": 229449,
+      "orderIds": [
+        "0f405243033441a7910849f7f26fec2b",
+        "1a75c135cddd959bc928ad1cccf932a1",
+        "37fc44460574b368fe7933c6ae98f224",
+        "42fd8129e4153758fd7bed28d50218f4",
+        "44c536f6ba15a4faf44a3b9aa9ee803b",
+        "494f869f61ebf5fd01f40a4a2a569481"
+      ],
+      "orderIdsTruncated": true
+    },
+    {
+      "date": "2018-04-28",
+      "itemCount": 3,
+      "orderCount": 3,
+      "itemRevenueCents": 21490,
+      "orderIds": [
+        "1a0698c23712555ab9567f13d04fd704",
+        "5a89c5077684b44a0094ed4aaa70a234",
+        "a24556b6b72ac70719c99dea12e0aa75"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-04-29",
+      "itemCount": 8,
+      "orderCount": 8,
+      "itemRevenueCents": 56579,
+      "orderIds": [
+        "17341621682ba3c2b7bc79fd48d22a34",
+        "328c309ec547992c3c426906fe279dc0",
+        "5607f0f13187c06655842d7a41b6d109",
+        "66f09793372dff42b079b7578f7157ee",
+        "8ec03a8bf91f7efde7eb3ecc6c6b2b03",
+        "a323136c70288cf38733120f38fd5130"
+      ],
+      "orderIdsTruncated": true
+    },
+    {
+      "date": "2018-04-30",
+      "itemCount": 11,
+      "orderCount": 10,
+      "itemRevenueCents": 125490,
+      "orderIds": [
+        "04cc9ab9d21b11d7aca691cf7facaaa1",
+        "23072f93197ce1005af84937345b910d",
+        "2b59c2841614c2185b24fe1e009571de",
+        "55a1a4bc56ccf7a49bc62bcd975d3162",
+        "6a7ac200511e303dca7161f95949dee8",
+        "6f8a410f9542c68dbb680d2aa47b6d14"
+      ],
+      "orderIdsTruncated": true
+    },
+    {
+      "date": "2018-05-01",
+      "itemCount": 14,
+      "orderCount": 13,
+      "itemRevenueCents": 171850,
+      "orderIds": [
+        "3f26a399c8a1c0cf2c9dc8a194b134d3",
+        "518a89db9918a8553dbc760454cc7634",
+        "632f22d24375715fbfa8c0ae2e5d35b7",
+        "7e680cdc973a1bda4710a1fc19e990a7",
+        "8310cdbd05266e3cd7777e012ad9e5ea",
+        "842e1880e0859a810c436d8576aab76b"
+      ],
+      "orderIdsTruncated": true
+    },
+    {
+      "date": "2018-05-02",
+      "itemCount": 14,
+      "orderCount": 14,
+      "itemRevenueCents": 106169,
+      "orderIds": [
+        "16e5e020f226b58f660770e190042ad2",
+        "38d6205cb4508e8d63dcbae0aac1fe96",
+        "4042753ccc5a8c7ab778aa7856ca6230",
+        "4e102515dd3511449d6a1bf57bfc0d6b",
+        "707ce3d3698a90d1ab9d9c2dc47223c2",
+        "917399e96f92268dfa2c0351b1b75fba"
+      ],
+      "orderIdsTruncated": true
+    },
+    {
+      "date": "2018-05-03",
+      "itemCount": 4,
+      "orderCount": 3,
+      "itemRevenueCents": 43980,
+      "orderIds": [
+        "9570539b2a98b46f96b1b029b1d76b03",
+        "ba2018431e2b0cec56147edc7a0627a5",
+        "f5de15fee5da7c522b0aa5837f99a1db"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-05-04",
+      "itemCount": 10,
+      "orderCount": 9,
+      "itemRevenueCents": 148549,
+      "orderIds": [
+        "059c31805aaf1f282276575595379050",
+        "119deda2a77e33414b216eec6ababd07",
+        "33d470ee269df634f8a69cd40ee2c170",
+        "3d500e622ba77dd0cc04cc8ccd2bb859",
+        "406e7d5f44dce0761a29b6a22889a98c",
+        "7bb02c36bd3bb7f11f1fce9fea141af3"
+      ],
+      "orderIdsTruncated": true
+    },
+    {
+      "date": "2018-05-05",
+      "itemCount": 3,
+      "orderCount": 3,
+      "itemRevenueCents": 22480,
+      "orderIds": [
+        "1b640919f98cb92c70a328ca7625c3db",
+        "d08eb402923cd72cb3b9f91028330de7",
+        "dc7997edb72a765e7b39dbb9be3a63a2"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-05-06",
+      "itemCount": 12,
+      "orderCount": 7,
+      "itemRevenueCents": 68650,
+      "orderIds": [
+        "2ebb1fd53e7b4bd81b7b1e9242b91262",
+        "5f8727348fdce5ad81ba441d3bf9e18c",
+        "6fbd65f0ae756ffd1692f812a7b411a4",
+        "a7ce5e5684c181d2989559f9d54119dc",
+        "c45686ed86426af3f7be41420b6020ea",
+        "c8a118d2edafad1835b83c6a42145427"
+      ],
+      "orderIdsTruncated": true
+    },
+    {
+      "date": "2018-05-07",
+      "itemCount": 12,
+      "orderCount": 12,
+      "itemRevenueCents": 125570,
+      "orderIds": [
+        "08c3d8da1ee7ffc88a41cd145a4675ba",
+        "3288845a804de0e644d882a3b5f95bd8",
+        "41cd06b8f16a95fcaf0ebbf0a4c23040",
+        "4978579248016c3a09d6dc043bbc4ae0",
+        "62a4c6ee1b6f43e8a1ac86ad87fb0f35",
+        "742cbcd370fd2e637bf3f2570ac5ed2a"
+      ],
+      "orderIdsTruncated": true
+    },
+    {
+      "date": "2018-05-08",
+      "itemCount": 14,
+      "orderCount": 11,
+      "itemRevenueCents": 116620,
+      "orderIds": [
+        "0e40bd8d75ad8945ea6a9d1427142c49",
+        "1d5912d4e665fb2a085a50fc13007c02",
+        "3f80947ce4ab2d28cede3db5c92e44d7",
+        "61fbef83f544ba8f4a72cc7809d44628",
+        "7ad26c8f2f119d81460033a51a648dc8",
+        "81a37715c2240c1701ab6b81bb52e737"
+      ],
+      "orderIdsTruncated": true
+    },
+    {
+      "date": "2018-05-09",
+      "itemCount": 14,
+      "orderCount": 13,
+      "itemRevenueCents": 99079,
+      "orderIds": [
+        "00a870c6c06346e85335524935c600c0",
+        "079f16689c29acb6cab92978e6af2137",
+        "156f6f0ed73a57da184aecc81303bf9d",
+        "1f52d261d5a103a2a2375c21c99cd08d",
+        "2703773aea9533b606eed4f16f883e2e",
+        "31b82ff746d73aeab9bc070c10156273"
+      ],
+      "orderIdsTruncated": true
+    },
+    {
+      "date": "2018-05-10",
+      "itemCount": 7,
+      "orderCount": 5,
+      "itemRevenueCents": 47149,
+      "orderIds": [
+        "57478ee9ef95eb7cdf2d930b8ff9ff80",
+        "67d8f4eb477222d7b5b81daa8e007bdd",
+        "67ef29c9ba12b789eb12ac5ee9743826",
+        "9dd9df2aeed4645e230e7528a5b1d9ba",
+        "abe83805a67ed7f77964c988b79f5598"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-05-11",
+      "itemCount": 11,
+      "orderCount": 4,
+      "itemRevenueCents": 97900,
+      "orderIds": [
+        "4fcf0343be51fc2442adc4af890c8183",
+        "7a7b2262ffe011d9beeabfb73911f1c9",
+        "7cf28b17a5d8877124dfc9146f8f78e1",
+        "90349f264a3d6a2525a34598d09dda6b"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-05-12",
+      "itemCount": 4,
+      "orderCount": 2,
+      "itemRevenueCents": 35980,
+      "orderIds": [
+        "a7c318c46e14332323a101743ccfc72d",
+        "fab2aac6ff265cb5b66ffec77b3fd882"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-05-13",
+      "itemCount": 4,
+      "orderCount": 4,
+      "itemRevenueCents": 39799,
+      "orderIds": [
+        "16122f8c266bab7e444b39ecba27c9db",
+        "bf296db5d351091ec564052c8beed8b3",
+        "bfa2cf122902aef8481770976e16e408",
+        "cc12de2df2defa0f3352ae0d4bd2ffa2"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-05-14",
+      "itemCount": 13,
+      "orderCount": 12,
+      "itemRevenueCents": 181599,
+      "orderIds": [
+        "422040395c164b8b5c0255af3c710646",
+        "448f2134b405628295b62b343cac4d01",
+        "52c50c7534490a8391f8f6fd7115405a",
+        "6a8ead05c1fec9733ff10c379faa4e59",
+        "6d9e993faed56b20fe3f762fd8bbf24f",
+        "7ce33b4d8b77b96a9a44c1295d534cd7"
+      ],
+      "orderIdsTruncated": true
+    },
+    {
+      "date": "2018-05-15",
+      "itemCount": 17,
+      "orderCount": 7,
+      "itemRevenueCents": 201497,
+      "orderIds": [
+        "35cce165fe029166f2ca5396ab15eb50",
+        "814fe5df303b0c72aeddb331dbfe9802",
+        "c49be9a11fd13933307cc6a19b03a895",
+        "c50da75d0af4bf40f1213d2d8d5f13b4",
+        "e3ee317683c1cb4df51994ca63755d6d",
+        "eb2e70f9dff6ed61b9b0e5a02001d973"
+      ],
+      "orderIdsTruncated": true
+    },
+    {
+      "date": "2018-05-16",
+      "itemCount": 17,
+      "orderCount": 11,
+      "itemRevenueCents": 315550,
+      "orderIds": [
+        "130e5f15b505062879273e8f199441d1",
+        "2bb9ca1905f76e4e33fc5ae85351dbee",
+        "410a396b1c7bbf059e3f2d028342177b",
+        "4c95e64d87f0a8e6c7e8ffc83767df0f",
+        "5dc0af9bde879bc9546685cc7c1035da",
+        "70c9e0c247d9f1e785e3a31d2a333ec6"
+      ],
+      "orderIdsTruncated": true
+    },
+    {
+      "date": "2018-05-17",
+      "itemCount": 13,
+      "orderCount": 11,
+      "itemRevenueCents": 156130,
+      "orderIds": [
+        "1eea4fee5608c3a7087b63a20a3c7b18",
+        "25f4376934e13d3508486352e11a5db0",
+        "2f9e8d64d770c904151499dd92659043",
+        "38cd9a16e2ee3ee519de420fc15d77ff",
+        "46ca5520b760899050553edaf87845fe",
+        "71a2d0d183bfb1065bfa35ffd449471a"
+      ],
+      "orderIdsTruncated": true
+    },
+    {
+      "date": "2018-05-18",
+      "itemCount": 11,
+      "orderCount": 8,
+      "itemRevenueCents": 155380,
+      "orderIds": [
+        "41ce1e9cd5fac4c3171a6e1c4dd6281e",
+        "447bd8e2281ef147772c942e18c2229c",
+        "5e41372dfed214a973d082c2ba36e9a1",
+        "67b0b5998d225c031727557708e9bfb3",
+        "8a272395043f280e270091176b7f392d",
+        "ec6752845f9c553dcaeb40318b0df3ce"
+      ],
+      "orderIdsTruncated": true
+    },
+    {
+      "date": "2018-05-19",
+      "itemCount": 3,
+      "orderCount": 3,
+      "itemRevenueCents": 18780,
+      "orderIds": [
+        "29152a6bbb878d0f03d10e9ee8f59093",
+        "7de1ba35d9d0422c7129096639f316c9",
+        "b6486d95eebb7818b61f0f052d470f0c"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-05-20",
+      "itemCount": 5,
+      "orderCount": 4,
+      "itemRevenueCents": 34270,
+      "orderIds": [
+        "29704af83588033bed1de27af569ab14",
+        "352d96ca187708670e0f8ec35af10421",
+        "8b5be28b78c96b28adca40358eed3d7b",
+        "aea25973afa6e521393a98e850ebe672"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-05-21",
+      "itemCount": 10,
+      "orderCount": 7,
+      "itemRevenueCents": 79940,
+      "orderIds": [
+        "0a72bb193c65199cdd69574aac533a83",
+        "253009218018b92ca2f36309c8dc97cf",
+        "4b6c735cae2db7ba05d5e51ea8693bc6",
+        "9bb0677f0c84788b3c3a9079ba085f69",
+        "a9c5d437c9cc6fe13dfe671f0dcc7ebc",
+        "c0834ece62641e0d8cf5da3a070f4195"
+      ],
+      "orderIdsTruncated": true
+    },
+    {
+      "date": "2018-05-22",
+      "itemCount": 7,
+      "orderCount": 6,
+      "itemRevenueCents": 57379,
+      "orderIds": [
+        "2a979e13109e885e514dd6e33ea99895",
+        "6554129577eff36836f1a93894b64f42",
+        "8250f4901ec804e830f26ef6fc285138",
+        "a057392bd88e2acf040eb2a5674b557c",
+        "a406f3654d0144e1d742f8e7d6b30060",
+        "d5949030ef220e0fdbf194f9ac503698"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-05-23",
+      "itemCount": 7,
+      "orderCount": 7,
+      "itemRevenueCents": 48930,
+      "orderIds": [
+        "0a2f51f07c7b99722f843490cd20ec09",
+        "18987d9e9060c343e5ed6e796aab9189",
+        "488d5fc485f4624acb8132918763416c",
+        "52213ce438ca7a21ce81bc3d48a3d4e3",
+        "90c76ed1638b6bf4f87d58e19b3d1349",
+        "90feb1846fa42bbfe6d411d2d018d194"
+      ],
+      "orderIdsTruncated": true
+    },
+    {
+      "date": "2018-05-24",
+      "itemCount": 5,
+      "orderCount": 5,
+      "itemRevenueCents": 75290,
+      "orderIds": [
+        "00beb247698c6aae94e3f859d279e2cd",
+        "13a129044d7c671ff1ca959083f80653",
+        "23df618cc33c091a2663120f9de8dbfd",
+        "6d5e087df6cf3e6440c325e21c9a1c7c",
+        "c4be264e023710df94440abb4db0a621"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-05-25",
+      "itemCount": 7,
+      "orderCount": 5,
+      "itemRevenueCents": 69950,
+      "orderIds": [
+        "2177c4dbccb15e413419402aa089b530",
+        "359d387a5354eedce6105f09097195d2",
+        "4652332a6a0d39960cdec082ef7b52b8",
+        "4d5d37abd78b5223433230deee7d4e29",
+        "7207091d29c0f0df59dfe6e1cb216f2b"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-05-26",
+      "itemCount": 5,
+      "orderCount": 5,
+      "itemRevenueCents": 37670,
+      "orderIds": [
+        "1a2582ca80feaaf937cc94d437ba1635",
+        "32bde441c2a8669167988229bcafe2d7",
+        "5be47775fbd521b6104cf7ed466afafb",
+        "765f62aa9ec878cf62b1533261ae8e87",
+        "cfb94976becda338ad4171c3c072561c"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-05-27",
+      "itemCount": 0,
+      "orderCount": 0,
+      "itemRevenueCents": 0,
+      "orderIds": [],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-05-28",
+      "itemCount": 3,
+      "orderCount": 3,
+      "itemRevenueCents": 51000,
+      "orderIds": [
+        "1efa3bd33f2a887addccba92edc88340",
+        "2ee0dd09094bb9568b06bc1ffbe9f4ec",
+        "e156c06e2ceacafe7263782d2115fca8"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-05-29",
+      "itemCount": 6,
+      "orderCount": 4,
+      "itemRevenueCents": 91390,
+      "orderIds": [
+        "7d6b40109573304141d61d0eb6819e48",
+        "9f672a6ad991e6e232e91e479ab1d0ef",
+        "b058f625ecdea748969b3d9f508873fb",
+        "ce5a9de9a8a2c2a47c627c3615f90700"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-05-30",
+      "itemCount": 9,
+      "orderCount": 4,
+      "itemRevenueCents": 107500,
+      "orderIds": [
+        "0f275b411f77d6ea9ac2132609f4a332",
+        "2db6682455f3a6b47b5202e00c855789",
+        "58933cbe8ca93dbada467cc7b2eebd7c",
+        "a5c654c2a0126153f98af71a65a159de"
+      ],
+      "orderIdsTruncated": false
+    },
+    {
+      "date": "2018-05-31",
+      "itemCount": 0,
+      "orderCount": 0,
+      "itemRevenueCents": 0,
+      "orderIds": [],
+      "orderIdsTruncated": false
+    }
+  ],
+  "topProducts": [
+    {
+      "productId": "aca2eb7d00ea1a7b8ebd4e68314663af",
+      "category": "moveis_decoracao",
+      "itemCount": 87,
+      "itemRevenueCents": 608130,
+      "unitPriceCents": 6990
+    },
+    {
+      "productId": "928e52a9ad53a294fdcc91bcf59d1751",
+      "category": "utilidades_domesticas",
+      "itemCount": 23,
+      "itemRevenueCents": 299000,
+      "unitPriceCents": 13000
+    },
+    {
+      "productId": "216bb0e0cd43ffd832e0973d35e0377e",
+      "category": "construcao_ferramentas_iluminacao",
+      "itemCount": 16,
+      "itemRevenueCents": 72000,
+      "unitPriceCents": 4500
+    },
+    {
+      "productId": "31a89a7044c5b133cf646404a4e86022",
+      "category": "utilidades_domesticas",
+      "itemCount": 16,
+      "itemRevenueCents": 240000,
+      "unitPriceCents": 15000
+    },
+    {
+      "productId": "7c55ea4aea1acf1ce11440010f5aa298",
+      "category": "utilidades_domesticas",
+      "itemCount": 8,
+      "itemRevenueCents": 319200,
+      "unitPriceCents": 39900
+    },
+    {
+      "productId": "a5bbc554f75cf4afa2cd56791015ec27",
+      "category": "instrumentos_musicais",
+      "itemCount": 8,
+      "itemRevenueCents": 44000,
+      "unitPriceCents": 5500
+    },
+    {
+      "productId": "97f1396a5a1f7c07ba51784efdec44b8",
+      "category": "utilidades_domesticas",
+      "itemCount": 7,
+      "itemRevenueCents": 97300,
+      "unitPriceCents": 13900
+    },
+    {
+      "productId": "2948658cb6abc82847412be7201bfc4c",
+      "category": "beleza_saude",
+      "itemCount": 6,
+      "itemRevenueCents": 66000,
+      "unitPriceCents": 11000
+    }
+  ],
+  "notEmitted": [
+    "unitCostCents \u2014 Olist publishes no cost of goods for any seller",
+    "stockOnHand \u2014 Olist publishes no inventory position",
+    "grossMarginPct / netMarginPct \u2014 not derivable without recorded costs",
+    "payoutDate / payoutAmount \u2014 Olist publishes no seller payout ledger"
+  ],
+  "notes": [
+    "Revenue is the sum of this seller's own order_items.price only.",
+    "Orders with status canceled or unavailable are excluded.",
+    "Freight is recorded separately and is not counted as seller revenue.",
+    "All amounts are BRL integer cents, exactly as published."
+  ]
+}

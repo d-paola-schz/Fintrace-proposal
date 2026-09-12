@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: preflight
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      # Set these in the Render dashboard. They are never committed and never
+      # reach the browser bundle.
+      - key: NESSIE_API_KEY
+        sync: false
+      - key: NESSIE_ACCOUNT_ID
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: AI_PROVIDER
+        value: gemini
