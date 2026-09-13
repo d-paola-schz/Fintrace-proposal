@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/preflight/preflight/server/internal/contracts"
 	"github.com/preflight/preflight/server/internal/finance"
@@ -47,6 +48,41 @@ func presentEvents(events []contracts.FinancialEvent, ids ...string) []string {
 	return out
 }
 
+// blamedOutflow picks, among the events the engine says landed on the breach
+// day, the single largest outflow to name in the narrative. The engine
+// already knows which ids applied that day (BreachEventIDs); this only
+// chooses which of those is worth naming as "the payment that pushes it
+// under" — it never assumes a specific event exists.
+func blamedOutflow(events []contracts.FinancialEvent, ids []string) (contracts.FinancialEvent, bool) {
+	var worst contracts.FinancialEvent
+	found := false
+	for _, id := range ids {
+		e, ok := findEvent(events, id)
+		if !ok || e.AmountCents >= 0 {
+			continue // not an outflow (or the payout itself, which is positive)
+		}
+		if !found || e.AmountCents < worst.AmountCents {
+			worst, found = e, true
+		}
+	}
+	return worst, found
+}
+
+// dayGap is the whole-day difference between two ISO dates, floored at 0 so a
+// bad or reversed pair never prints a negative "days".
+func dayGap(fromISO, toISO string) int {
+	from, err1 := finance.ParseDate(fromISO)
+	to, err2 := finance.ParseDate(toISO)
+	if err1 != nil || err2 != nil {
+		return 0
+	}
+	days := int(finance.Day(to).Sub(finance.Day(from)).Hours() / 24)
+	if days < 0 {
+		return 0
+	}
+	return days
+}
+
 func findEvent(events []contracts.FinancialEvent, id string) (contracts.FinancialEvent, bool) {
 	for _, e := range events {
 		if e.ID == id {
@@ -56,20 +92,50 @@ func findEvent(events []contracts.FinancialEvent, id string) (contracts.Financia
 	return contracts.FinancialEvent{}, false
 }
 
+// findEventByKind resolves an event by its Kind rather than a literal id, so
+// this chain does not depend on the demo's specific event ids ("evt-payout",
+// "evt-asm-supplier") — only on the roles (Kind values) normalize.go already
+// assigns. A different business's data with a differently-named supplier
+// event is found the same way, as long as it carries Kind
+// "supplier_payment". Ties (more than one event of the same kind) are not
+// handled — the first match wins — which is fine for this demo's one-of-each
+// data and a known limitation beyond it.
+func findEventByKind(events []contracts.FinancialEvent, kind string) (contracts.FinancialEvent, bool) {
+	for _, e := range events {
+		if e.Kind == kind {
+			return e, true
+		}
+	}
+	return contracts.FinancialEvent{}, false
+}
+
+// supplierPaymentKind is the Kind normalize.go assigns the demo's supplier
+// outflow. finance.PayoutEventKind is the equivalent constant for the payout.
+const supplierPaymentKind = "supplier_payment"
+
 func (b *Builder) payoutTimingChain(res contracts.ScenarioResult, events []contracts.FinancialEvent) contracts.Chain {
-	payout, _ := findEvent(events, "evt-payout")
-	supplier, _ := findEvent(events, "evt-asm-supplier")
-	rent, _ := findEvent(events, "evt-asm-rent")
+	payout, _ := findEventByKind(events, finance.PayoutEventKind)
+	supplier, _ := findEventByKind(events, supplierPaymentKind)
 	bp := res.DelayBreakpoint
 
+	// The gap between the two dated events, computed from whatever their dates
+	// actually are right now — not assumed. A payout delay moves payout.Date
+	// but not supplier.Date, so this was wrong (fixed at "3 days") the moment
+	// any delay was applied.
+	gapDays := dayGap(supplier.Date, payout.Date)
+	gapPhrase := fmt.Sprintf("%d days", gapDays)
+	if gapDays == 1 {
+		gapPhrase = "1 day"
+	}
+
 	chain := contracts.Chain{
-		ID: "chain-payout", RootEventID: "evt-payout", Direction: "below",
+		ID: "chain-payout", RootEventID: payout.ID, Direction: "below",
 		Title: "Payout timing", RuleID: RulePayoutTiming,
 	}
 
 	// ---- Node 01: what is actually on the calendar. Observed, needs review.
 	n1 := contracts.ChainNode{
-		ID: "node-payout-1", ChainID: chain.ID, RootEventID: "evt-payout", Sequence: 1,
+		ID: "node-payout-1", ChainID: chain.ID, RootEventID: payout.ID, Sequence: 1,
 		Title:  "Payment comes first",
 		Tone:   contracts.ToneReview,
 		Status: contracts.StatusObserved,
@@ -78,16 +144,16 @@ func (b *Builder) payoutTimingChain(res contracts.ScenarioResult, events []contr
 			finance.FormatUSD(-supplier.AmountCents), finance.HumanDate(supplier.Date),
 			finance.FormatUSD(payout.AmountCents), finance.HumanDate(payout.Date)),
 		Explanation: fmt.Sprintf(
-			"Your supplier payment of %s is dated %s. The marketplace payout of %s is not expected until %s, three days later. The payment therefore has to clear out of the balance you already hold, not out of money that has arrived. The payout's date and amount are both modeled for this demonstration — Olist publishes no payout ledger — so this ordering is an assumption you can change, not a record.",
+			"Your supplier payment of %s is dated %s. The marketplace payout of %s is not expected until %s, %s later. The payment therefore has to clear out of the balance you already hold, not out of money that has arrived. The payout's date and amount are both modeled for this demonstration — Olist publishes no payout ledger — so this ordering is an assumption you can change, not a record.",
 			finance.FormatUSD(-supplier.AmountCents), finance.HumanDate(supplier.Date),
-			finance.FormatUSD(payout.AmountCents), finance.HumanDate(payout.Date)),
+			finance.FormatUSD(payout.AmountCents), finance.HumanDate(payout.Date), gapPhrase),
 		SourceRefs:     []string{"asm-supplier", "asm-payout", "src-olist-window"},
 		AssumptionRefs: []string{"asm-payout", "asm-fee", "asm-fx"},
 		Claims: []contracts.Claim{
 			claimOf(supplier), claimOf(payout),
 			{
 				ID: "claim-gap-days", Label: "Days between the payment and the payout",
-				Display: "3 days", Provenance: contracts.ProvDerived,
+				Display: gapPhrase, Provenance: contracts.ProvDerived,
 				SourceRefs: []string{"asm-supplier", "asm-payout"},
 				Note:       "Difference between the two dated events above.",
 			},
@@ -95,22 +161,22 @@ func (b *Builder) payoutTimingChain(res contracts.ScenarioResult, events []contr
 		ResponseOptions: []contracts.ResponseOption{
 			{ID: "opt-open-payout", Label: "Test a different payout date",
 				Detail: "Move the expected payout and watch every projected day recompute.",
-				Action: "adjust_payout_delay", Value: "3"},
+				Action: "adjust_payout_delay", Value: fmt.Sprintf("%d", gapDays)},
 		},
 		SuggestedAsks: []string{
 			"Why does this payment not come out of the payout?",
 			"What exactly is assumed about this payout?",
 		},
 		// The two dates the sentence above is comparing.
-		HighlightEventIDs: presentEvents(events, "evt-asm-supplier", "evt-payout"),
+		HighlightEventIDs: presentEvents(events, supplier.ID, payout.ID),
 	}
 
 	// ---- Node 02: the stress test. Tone follows the engine's finding.
 	n2 := contracts.ChainNode{
-		ID: "node-payout-2", ChainID: chain.ID, RootEventID: "evt-payout", Sequence: 2,
+		ID: "node-payout-2", ChainID: chain.ID, RootEventID: payout.ID, Sequence: 2,
 		Status:         contracts.StatusPossible,
 		RuleID:         RulePayoutTiming,
-		SourceRefs:     []string{"asm-payout", "asm-supplier", "asm-rent", "src-nessie-account"},
+		SourceRefs:     []string{"asm-payout", "asm-reserve", "src-nessie-account"},
 		AssumptionRefs: []string{"asm-reserve", "asm-payout", "asm-fee"},
 		ResponseOptions: []contracts.ResponseOption{
 			{ID: "opt-delay-test", Label: "Apply that delay to the timeline",
@@ -122,14 +188,17 @@ func (b *Builder) payoutTimingChain(res contracts.ScenarioResult, events []contr
 			"Which payment causes the shortfall?",
 		},
 	}
-	// The payout is always part of this step; the outflow named alongside it is
-	// whichever one the engine actually blamed.
-	n2.HighlightEventIDs = presentEvents(events, "evt-payout")
+	// The payout is always part of this step; which outflow is named alongside
+	// it comes from bp.BreachEventIDs — what the engine actually found sitting
+	// on the breach day in its own trial projection — never assumed by name.
+	// A fixed guess (e.g. always "rent") was correct only by coincidence for
+	// the one dataset this was first written against.
+	n2.HighlightEventIDs = presentEvents(events, payout.ID)
 	if bp.Found {
-		if bp.DelayDays == 0 {
-			n2.HighlightEventIDs = presentEvents(events, "evt-payout", "evt-asm-supplier")
-		} else {
-			n2.HighlightEventIDs = presentEvents(events, "evt-payout", "evt-asm-rent")
+		n2.HighlightEventIDs = presentEvents(events, append([]string{payout.ID}, bp.BreachEventIDs...)...)
+		blamed, hasBlamed := blamedOutflow(events, bp.BreachEventIDs)
+		if hasBlamed {
+			n2.SourceRefs = append(n2.SourceRefs, blamed.SourceRefs...)
 		}
 		n2.Tone = contracts.ToneRisk
 		if bp.DelayDays == 0 {
@@ -139,15 +208,23 @@ func (b *Builder) payoutTimingChain(res contracts.ScenarioResult, events []contr
 		}
 		n2.Summary = fmt.Sprintf("First breach %s, cash %s",
 			finance.HumanDate(bp.BreachDate), finance.FormatUSD(bp.LowestCents))
-		if bp.DelayDays == 0 {
+		switch {
+		case bp.DelayDays == 0:
 			n2.Explanation = bp.Explanation +
 				" Removing or moving the commitment that causes it is what changes the answer, not the payout date." +
 				appliedDelayNote(res)
-		} else {
+		case hasBlamed:
 			n2.Explanation = fmt.Sprintf(
 				"%s The payment that pushes it under is %s of %s on %s: with the payout still outstanding, that day closes below the floor. Delays shorter than %d days stay at or above it.%s",
-				bp.Explanation, rent.Label, finance.FormatUSD(-rent.AmountCents),
-				finance.HumanDate(rent.Date), bp.DelayDays, appliedDelayNote(res))
+				bp.Explanation, blamed.Label, finance.FormatUSD(-blamed.AmountCents),
+				finance.HumanDate(bp.BreachDate), bp.DelayDays, appliedDelayNote(res))
+		default:
+			// No single outflow on the breach day exceeds the balance on its
+			// own — the breach comes from the accumulated events, not one
+			// payment. Say that rather than naming something that isn't true.
+			n2.Explanation = fmt.Sprintf(
+				"%s Delays shorter than %d days stay at or above it.%s",
+				bp.Explanation, bp.DelayDays, appliedDelayNote(res))
 		}
 	} else {
 		n2.Tone = contracts.ToneReview
@@ -181,7 +258,7 @@ func (b *Builder) payoutTimingChain(res contracts.ScenarioResult, events []contr
 
 	// ---- Node 03: what the owner could do. Always a proposal, never an action.
 	n3 := contracts.ChainNode{
-		ID: "node-payout-3", ChainID: chain.ID, RootEventID: "evt-payout", Sequence: 3,
+		ID: "node-payout-3", ChainID: chain.ID, RootEventID: payout.ID, Sequence: 3,
 		Title:   "Two ways to protect the reserve",
 		Tone:    contracts.ToneOpportunity,
 		Status:  contracts.StatusAction,
@@ -214,7 +291,7 @@ func (b *Builder) payoutTimingChain(res contracts.ScenarioResult, events []contr
 			"What if I halve the ad spend instead?",
 		},
 		// The two outflows this step proposes moving.
-		HighlightEventIDs: presentEvents(events, "evt-asm-ads", "evt-asm-supplier"),
+		HighlightEventIDs: presentEvents(events, "evt-asm-ads", supplier.ID),
 	}
 
 	chain.Nodes = []contracts.ChainNode{n1, n2, n3}
@@ -257,19 +334,41 @@ func (b *Builder) salesStockChain() contracts.Chain {
 		Title: "Sales mix", RuleID: RuleSalesStock,
 	}
 
+	// The demo seller happens to have sold the same item count in both windows,
+	// which let an earlier version of this sentence hardcode "up" and "the same
+	// count" as if they were always true. Neither is: a different seller (or
+	// this same one in a different window) can show revenue falling, or a
+	// changed item count, and the sentence must say so rather than assert the
+	// one seller's coincidence as a rule.
+	direction := "up"
+	if deltaPct < 0 {
+		direction = "down"
+	}
+	countNote := "the same count"
+	switch {
+	case win.ItemCount > prior.ItemCount:
+		countNote = fmt.Sprintf("%d more items", win.ItemCount-prior.ItemCount)
+	case win.ItemCount < prior.ItemCount:
+		countNote = fmt.Sprintf("%d fewer items", prior.ItemCount-win.ItemCount)
+	}
+	tone := contracts.ToneOpportunity
+	if deltaPct < 0 {
+		tone = contracts.ToneReview
+	}
+
 	n1 := contracts.ChainNode{
 		ID: "node-sales-1", ChainID: chain.ID, RootEventID: rootID, Sequence: 1,
-		Title:  fmt.Sprintf("Revenue up %.1f%%, same volume", deltaPct),
-		Tone:   contracts.ToneOpportunity,
+		Title:  fmt.Sprintf("Revenue %s %.1f%%, %s", direction, math.Abs(deltaPct), countNote),
+		Tone:   tone,
 		Status: contracts.StatusObserved,
 		RuleID: RuleSalesStock,
-		Summary: fmt.Sprintf("%d items both windows, %s average item price",
-			win.ItemCount, finance.FormatBRL(avgNow)),
+		Summary: fmt.Sprintf("%d items this window (%d prior), %s average item price",
+			win.ItemCount, prior.ItemCount, finance.FormatBRL(avgNow)),
 		Explanation: fmt.Sprintf(
-			"This seller sold %d items in the 30 days to %s and %d items in the 30 days before that — the same count — yet recorded item revenue rose %.1f%%, from %s to %s. The whole difference is average item price: %s against %s. These are the seller's own recorded order-item rows, with cancelled and unavailable orders excluded.",
-			win.ItemCount, win.End, prior.ItemCount, deltaPct,
+			"This seller sold %d items in the 30 days to %s and %d items in the 30 days before that — %s — while recorded item revenue went %s %.1f%%, from %s to %s. Average item price moved from %s to %s. These are the seller's own recorded order-item rows, with cancelled and unavailable orders excluded.",
+			win.ItemCount, win.End, prior.ItemCount, countNote, direction, math.Abs(deltaPct),
 			finance.FormatBRL(prior.ItemRevenueCents), finance.FormatBRL(win.ItemRevenueCents),
-			finance.FormatBRL(avgNow), finance.FormatBRL(avgPrior)),
+			finance.FormatBRL(avgPrior), finance.FormatBRL(avgNow)),
 		SourceRefs:     []string{"src-olist-window", "src-olist-prior", "src-olist-seller"},
 		AssumptionRefs: []string{"asm-timeshift"},
 		Claims: []contracts.Claim{
