@@ -1,4 +1,4 @@
-# Preflight — Capital One Challenge
+# Fintrace — Capital One Challenge
 
 A cash decision workspace for a small e-commerce owner. One horizontal timeline
 through the middle of the screen, folded chains of evidence hanging off the
@@ -12,10 +12,36 @@ without breaking my reserve?*
 - **Data preparation** — Python + DuckDB, offline, once. Nothing Python runs
   during the demo.
 
-**Design reference:** [Figma Make — E-commerce Financial Decision Workspace](https://www.figma.com/make/VzcWdUaaq2UaS0fwlHP7n0/E-commerce-Financial-Decision-Workspace?t=7m6Rt55X4JkwBsem-0).
-The Figma prototype is an aesthetic reference only. Its illustrative copy and its
-mismatched selected-node state are **not** treated as facts — see
-[Corrections to the prototype](#corrections-to-the-figma-prototype).
+## Scope
+
+**What this is:** a working prototype for one onboarded business — real
+historical sales for one Olist seller, a real Nessie sandbox bank balance,
+and a deterministic engine that projects cash, stress-tests a payout delay,
+and checks a proposed purchase against a reserve. The AI only rephrases
+figures the engine already computed; every number on screen names its own
+source and its own confidence (`live` / `fixture` / `snapshot` / `demo
+assumption`).
+
+**What it deliberately doesn't do (yet):**
+- **No multi-business support.** One seller, one bank account, no signup, no
+  database — state lives in memory and is rebuilt from the prepared files on
+  every request. Serving a second business today means editing those files,
+  not creating an account.
+- **No live CSV/file upload.** Olist data is normalized offline, once, by
+  `scripts/prepare_olist.py`, and committed as a small JSON file — not
+  ingested at request time.
+- **No margin, inventory, or cost-of-goods figures**, anywhere. The connected
+  sources don't contain them, so nothing here estimates them.
+- **Olist and Nessie are never joined as if they described the same
+  business** — they don't, and pretending otherwise would misrepresent the
+  data. See [§6 of `docs/DATA_PROVENANCE.md`](docs/DATA_PROVENANCE.md#6-today-vs-a-real-deployment-why-the-two-sources-are-not-joined)
+  for what a real multi-business deployment would need instead.
+- One narrative rule (which outflows count as a "movable lever" when
+  suggesting how to protect the reserve) still assumes this demo's specific
+  outflow categories. Documented, not hidden — see `docs/DATA_PROVENANCE.md`.
+
+Full detail behind every one of these is in
+[`docs/DATA_PROVENANCE.md`](docs/DATA_PROVENANCE.md) rather than repeated here.
 
 ## Run it locally
 
@@ -36,6 +62,19 @@ It runs with **no credentials at all**: the bank balance falls back to a clearly
 labelled fixture, and chat answers are written by the calculation engine instead
 of a language model.
 
+On Windows, `rebuild.ps1` does all of the above in one step — rebuilds the
+frontend and backend together, restarts the server, and confirms it actually
+came up before printing the URL:
+
+```powershell
+.\rebuild.ps1              # add -SkipInstall to skip `npm install`
+```
+
+This exists because a backend built from old code paired with a freshly built
+frontend (or vice versa) fails in confusing, silent ways — a field the UI
+expects is just missing from the API response. Prefer it over running `go
+build` and the old binary separately.
+
 During development, run the two sides separately:
 
 ```bash
@@ -54,7 +93,7 @@ Copy `.env.example` and fill in what you have.
 | `NESSIE_ACCOUNT_ID` | no | The sandbox account with the largest balance is used. |
 | `NESSIE_BASE_URL` | no | Defaults to `https://api.nessieisreal.com`. |
 | `GEMINI_API_KEY` | no | Header shows `AI UNAVAILABLE`; the engine writes chat answers itself and says so. Nothing is faked. |
-| `GEMINI_MODEL` | no | Defaults to `gemini-3.1-flash-lite` — chosen for its free-tier daily quota (500 requests/day vs. 20 for plain `gemini-3.6-flash` at the time of writing), which the full-size tier can exhaust mid-demo. Confirm current free-tier limits for your key in Google AI Studio before presenting; they change over time. If `/api/probe` reports a 404, the response names the models your key can actually use. |
+| `GEMINI_MODEL` | no | Defaults to `gemini-3.1-flash-lite` — chosen for its free-tier daily quota (500 requests/day), which the full-size tier can exhaust mid-demo. Confirm current free-tier limits for your key in Google AI Studio before presenting; they change over time. If `/api/probe` reports a 404, the response names the models your key can actually use. |
 | `GEMINI_BASE_URL` | no | Defaults to `https://generativelanguage.googleapis.com`. Only for testing against a stub. |
 | `AI_PROVIDER` | no | `gemini` when a key is present, otherwise none. Set `ollama` for a local model. |
 | `OLLAMA_BASE_URL` | no | Defaults to `http://127.0.0.1:11434`. Never expose it publicly. |
@@ -63,7 +102,7 @@ Copy `.env.example` and fill in what you have.
 
 ## Where every number comes from
 
-Preflight draws on **two unrelated sources** plus a short list of assumptions we
+Fintrace draws on **two unrelated sources** plus a short list of assumptions we
 wrote down deliberately. They are never joined into one ledger, and every figure
 on screen carries a badge naming its origin.
 
@@ -79,7 +118,7 @@ on screen carries a badge naming its origin.
 opening balance and future cash events do. Both rules are enforced by tests.
 
 **What the sources cannot support is never shown.** Olist publishes no cost of
-goods, no inventory and no payout ledger, so Preflight shows no margin and no
+goods, no inventory and no payout ledger, so Fintrace shows no margin and no
 days-of-stock figure. It names the one missing number instead.
 
 **Why aren't they joined?** Because they are not the same business — Olist is a
@@ -102,24 +141,10 @@ We substituted `955fee9216a65b617aa5c0531780ce60` — 1,498 order items, 1,286
 orders, 23 product categories, São Paulo. The substitution and the original's
 statistics are recorded in the prepared data and shown in the app.
 
-## Corrections to the Figma prototype
-
-The Figma file is a visual reference with illustrative copy. This implementation
-deliberately departs from it:
-
-- The timeline sits at the **vertical centre** of the workspace, not near the
-  bottom under a dominant cash chart.
-- Selection is coherent: the panel title, chart, evidence and chat always
-  describe the **same** node.
-- The banner points at **real future events** in the normalized data.
-- "Amazon", "repeat orders +34%", "six days of stock" and "statistically
-  consistent" are not reproduced as facts. No Amazon integration exists, and
-  inventory is not derived from Olist.
-
 ## Tests
 
 ```bash
-go test ./server/...                               # 60 tests
+go test ./server/...                               # 89 tests
 python3 -m venv .venv && .venv/bin/pip install duckdb
 .venv/bin/python scripts/verify_attribution.py     # data attribution checks
 ```
@@ -131,7 +156,7 @@ not being blamed on a delay, every citation resolving to a real source record,
 and the language model never emitting a number the engine did not compute.
 
 `scripts/verify_attribution.py` proves the multi-seller rule against the real
-CSVs: an Olist order can contain items from several sellers, and Preflight never
+CSVs: an Olist order can contain items from several sellers, and Fintrace never
 attributes a whole order's payment to one of them.
 
 ## Regenerate the prepared data
@@ -177,23 +202,6 @@ present this as a live integration."*
 Whatever the external state, the deterministic engine, the timeline, the chains
 and every figure keep working. Nessie falls back to the labelled fixture; chat
 falls back to engine-authored answers marked *"AI explanation unavailable"*.
-
-## Deploy
-
-One Render Free web service built from the included `Dockerfile`
-(see `render.yaml`). Health check: `/api/health`.
-
-1. Render → **New → Web Service** → connect this repo.
-2. Branch: `main` (or `integration/preflight-v2` if deploying before it merges). Runtime **Docker**, plan **Free**.
-   `render.yaml` already declares this if you use a Blueprint instead.
-3. Add the keys under **Environment** in the Render dashboard — never in the
-   repository, never in chat: `NESSIE_API_KEY`, `NESSIE_ACCOUNT_ID`,
-   `GEMINI_API_KEY`. `AI_PROVIDER=gemini` is set by the blueprint.
-4. After the deploy finishes, hit `/api/probe` and confirm each dependency
-   reports `connected: true` before describing it as connected.
-
-**Render Free sleeps after about 15 minutes idle and takes roughly a minute to
-wake.** Open the URL before presenting, and again shortly before judges do.
 
 ## Documentation
 

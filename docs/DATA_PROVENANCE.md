@@ -1,6 +1,6 @@
 # Where every number comes from
 
-Preflight draws on two sources that have nothing to do with each other, plus a
+Fintrace draws on two sources that have nothing to do with each other, plus a
 short list of assumptions we wrote down on purpose. The product never blends
 them into a single ledger, and every figure on screen carries a badge saying
 which one it came from.
