@@ -475,8 +475,8 @@ func (s *Server) facts(b *workspace.Builder, ws contracts.WorkspaceResponse, nod
 
 	facts = append(facts, res.Verdict)
 	facts = append(facts, fmt.Sprintf(
-		"The opening balance is %s, from %s.",
-		finance.FormatUSD(res.BaselineBalanceCents), res.BaselineSource))
+		"Your cash on hand today is %s.%s",
+		finance.FormatUSD(res.BaselineBalanceCents), b.BaselineCaveat()))
 	facts = append(facts, fmt.Sprintf(
 		"Lowest projected cash is %s on %s, against a %s reserve, leaving %s.",
 		finance.FormatUSD(res.LowestCents), finance.HumanDate(res.LowestDate),
