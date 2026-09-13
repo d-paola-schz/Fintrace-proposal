@@ -370,7 +370,7 @@ func (b *Builder) salesStockChain() contracts.Chain {
 		Summary: fmt.Sprintf("%d items this window (%d prior), %s average item price",
 			win.ItemCount, prior.ItemCount, finance.FormatBRL(avgNow)),
 		Explanation: fmt.Sprintf(
-			"This seller sold %d items in the 30 days to %s and %d items in the 30 days before that — %s — while recorded item revenue went %s %.1f%%, from %s to %s. Average item price moved from %s to %s. These are the seller's own recorded order-item rows, with cancelled and unavailable orders excluded.",
+			"You sold %d items in the 30 days to %s and %d items in the 30 days before that — %s — while your recorded item revenue went %s %.1f%%, from %s to %s. Your average item price moved from %s to %s. These are your own recorded order-item rows, with cancelled and unavailable orders excluded.",
 			win.ItemCount, win.End, prior.ItemCount, countNote, direction, math.Abs(deltaPct),
 			finance.FormatBRL(prior.ItemRevenueCents), finance.FormatBRL(win.ItemRevenueCents),
 			finance.FormatBRL(avgPrior), finance.FormatBRL(avgNow)),
@@ -397,7 +397,7 @@ func (b *Builder) salesStockChain() contracts.Chain {
 				ID: "claim-delta", Label: "Change in item revenue",
 				Display: fmt.Sprintf("%+.1f%%", deltaPct), Provenance: contracts.ProvDerived,
 				SourceRefs: []string{"src-olist-window", "src-olist-prior"},
-				Note:       "Both windows are 30 days and both count only this seller's items.",
+				Note:       "Both windows are 30 days and both count only your own items.",
 			},
 		},
 		Chart:           b.salesChart(),
@@ -430,7 +430,7 @@ func (b *Builder) salesStockChain() contracts.Chain {
 		RuleID:  RuleSalesStock,
 		Summary: fmt.Sprintf("%d of %d items, %s each", topCount, win.ItemCount, finance.FormatBRL(topPrice)),
 		Explanation: fmt.Sprintf(
-			"%d of the %d items sold in the window are the same product, in %s, at %s each. That concentration is worth knowing before any reorder decision, because a single product carrying a third of the volume is also a single point of failure. This is a count of recorded rows — it says nothing about how many units remain.",
+			"%d of the %d items you sold in the window are the same product, in %s, at %s each. That concentration is worth knowing before any reorder decision, because a single product carrying a third of the volume is also a single point of failure. This is a count of recorded rows — it says nothing about how many units remain.",
 			topCount, win.ItemCount, topCat, finance.FormatBRL(topPrice)),
 		SourceRefs:     []string{"src-olist-window", "src-olist-products"},
 		AssumptionRefs: []string{},
@@ -561,7 +561,7 @@ func (b *Builder) salesChart() *contracts.ChartSpec {
 	return &contracts.ChartSpec{
 		Kind: "weekly_sales", Currency: "USD",
 		Title:   "Recorded item sales, four weeks",
-		Caption: "This seller's own order items, converted at the demo rate and redrawn onto the current calendar. Sales, not bank deposits.",
+		Caption: "Your own order items, converted at the demo rate and redrawn onto the current calendar. Sales, not bank deposits.",
 		Points:  pts, Provenance: contracts.ProvOlistHistorical,
 		SourceRefs: []string{"src-olist-seller", "src-olist-window", "src-fx"},
 	}
