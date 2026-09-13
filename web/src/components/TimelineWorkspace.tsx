@@ -263,37 +263,50 @@ export function TimelineWorkspace({
   const cardTop = (row: number) => axisY - PILL_LANE - (row + 1) * (cardH + CARD_ROW_GAP)
   const branchCardTop = branchY - BRANCH_CARD_LIFT - cardH
 
-  const metricsFor = (dir: 1 | -1, lane: Lane): ChainMetrics =>
+  /**
+   * `extra` lengthens the first drop without moving any node: a chain above the
+   * rail hangs from its root card's own top, which sits lower than the top of
+   * the card band whenever that card is not in the top row.
+   */
+  const metricsFor = (dir: 1 | -1, lane: Lane, extra = 0): ChainMetrics =>
     lane === 'whatif'
       ? { ...DEFAULT_METRICS, firstLevel: FIRST_BELOW, levelGap: gapBranch, nodeH }
       : dir === 1
         ? { ...DEFAULT_METRICS, firstLevel: FIRST_BELOW, levelGap: gapBelow, nodeH }
-        : { ...DEFAULT_METRICS, firstLevel: FIRST_ABOVE, levelGap: gapAbove, nodeH }
+        : { ...DEFAULT_METRICS, firstLevel: FIRST_ABOVE + extra, levelGap: gapAbove, nodeH }
+
+  /** Top of the whole card band above the rail; closed tags above hang from here. */
+  const bandTop = axisY - PILL_LANE - cardBandH
+  const rootRow = (chain: Chain) =>
+    placed.find((p) => p.event.id === chain.rootEventId)?.row ?? rowCount - 1
 
   // A what-if chain always hangs below its own rail: above it is the plan.
   const anchorFor = (chain: Chain, lane: Lane) => {
     if (lane === 'whatif') {
       const root = wi?.events.find((e) => e.id === chain.rootEventId)
       const anchorX = root ? x(root.date) : branch ? x(branch.startDate) : EDGE_PAD
-      return { anchorX, anchorY: branchY, dir: 1 as const }
+      return { anchorX, anchorY: branchY, dir: 1 as const, extra: 0 }
     }
     const root = ws.events.find((e) => e.id === chain.rootEventId)
     const anchorX = root ? x(root.date) : EDGE_PAD
-    if (chain.direction === 'below') return { anchorX, anchorY: axisY, dir: 1 as const }
-    return { anchorX, anchorY: axisY - PILL_LANE - cardBandH, dir: -1 as const }
+    if (chain.direction === 'below') return { anchorX, anchorY: axisY, dir: 1 as const, extra: 0 }
+    // The strand has to touch the card it hangs from. Anchoring at the band top
+    // left a gap down to any root card sitting in a lower row.
+    const cardY = cardTop(rootRow(chain))
+    return { anchorX, anchorY: cardY, dir: -1 as const, extra: cardY - bandTop }
   }
 
   const focusLayout = useMemo(() => {
     if (!focusChain || !focusLane) return null
-    const { anchorX, anchorY, dir } = anchorFor(focusChain, focusLane)
+    const { anchorX, anchorY, dir, extra } = anchorFor(focusChain, focusLane)
     return {
       chain: focusChain,
       lane: focusLane,
       anchorX,
-      layout: layoutChain(focusChain, anchorX, anchorY, dir, false, metricsFor(dir, focusLane)),
+      layout: layoutChain(focusChain, anchorX, anchorY, dir, false, metricsFor(dir, focusLane, extra)),
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusChain, focusLane, ws.events, wi, axisY, branchY, cardBandH, gapAbove, gapBelow, gapBranch, nodeH, FIRST_BELOW])
+  }, [focusChain, focusLane, ws.events, wi, axisY, branchY, cardBandH, placed, gapAbove, gapBelow, gapBranch, nodeH, FIRST_BELOW])
 
   const planFocusRootId = focusLane === 'plan' ? (focusLayout?.chain.rootEventId ?? null) : null
   const branchFocusRootId = focusIsBranch ? (focusLayout?.chain.rootEventId ?? null) : null
@@ -650,19 +663,16 @@ export function TimelineWorkspace({
                     <line x1={x(event.date)} y1={cardTop(row) + cardH} x2={x(event.date)}
                       y2={axisY - RAIL_H / 2} stroke={hot ? 'var(--color-flow)' : '#b9c4d6'}
                       strokeWidth={hot ? 1.6 : 1.1} />
-                    <circle cx={x(event.date)} cy={axisY} r={hot ? 5.6 : 4.4} fill="#ffffff"
-                      stroke={hot ? '#17408f' : '#2f5fbe'} strokeWidth={hot ? 2.2 : 1.8} />
-                    <circle cx={x(event.date)} cy={axisY} r={hot ? 2 : 1.5} fill="#17408f" />
                   </g>
                 )
               })}
 
             {/* stubs of chain marking where a closed plan chain hangs */}
             {ws.chains.filter((c) => !(focusLane === 'plan' && c.id === openChain?.id)).map((c) => {
-              const { anchorX, dir } = anchorFor(c, 'plan')
-              const from = dir === 1 ? axisY : axisY - PILL_LANE - cardBandH
+              const { anchorX, anchorY, dir } = anchorFor(c, 'plan')
+              const from = dir === 1 ? axisY : bandTop
               return (
-                <line key={`stub-${c.id}`} x1={anchorX} y1={from} x2={anchorX}
+                <line key={`stub-${c.id}`} x1={anchorX} y1={anchorY} x2={anchorX}
                   y2={from + dir * dropFor(dir)} stroke="#b9a48c" strokeWidth={2.4}
                   strokeDasharray="1.4 5.5" strokeLinecap="round"
                   style={{ opacity: focused ? 0 : 0.9, transition: 'opacity 380ms ease' }} />
@@ -820,6 +830,23 @@ export function TimelineWorkspace({
               The band is an HTML layer above the rail drawing, so these get their
               own layer above the band. It never takes the pointer. */}
           <svg className="pointer-events-none absolute inset-0 z-[6]" width={canvasW} height={canvasH} aria-hidden>
+            {/* The point where each card's stem meets the rail. */}
+            {placed.filter(({ event, row }) => showsCard(event.id, row, event.date))
+              .map(({ event }) => {
+                const hot = selectedEvent?.lane === 'plan' && event.id === selectedEvent.id
+                return (
+                  <g key={`pt-${event.id}`}
+                    style={{
+                      opacity: focused && event.id !== planFocusRootId && !revealed.has(event.id) ? 0 : 1,
+                      transition: 'opacity 380ms ease',
+                    }}
+                  >
+                    <circle cx={x(event.date)} cy={axisY} r={hot ? 5.6 : 4.4} fill="#ffffff"
+                      stroke={hot ? '#17408f' : '#2f5fbe'} strokeWidth={hot ? 2.2 : 1.8} />
+                    <circle cx={x(event.date)} cy={axisY} r={hot ? 2 : 1.5} fill="#17408f" />
+                  </g>
+                )
+              })}
             <g style={{ opacity: focused ? CONTEXT_DIM : 1, transition: 'opacity 380ms ease' }}>
               {lowMark != null && (
                 <g>
