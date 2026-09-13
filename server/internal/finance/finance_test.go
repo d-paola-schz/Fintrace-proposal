@@ -37,7 +37,7 @@ func baseInput(t *testing.T, events ...contracts.FinancialEvent) Input {
 }
 
 // The reserve is a floor, not a trigger: landing exactly on it is safe and one
-// cent under is not. This boundary decides the demo's central claim.
+// cent under is not. This boundary decides the demo's central claim
 func TestReserveBoundaryExactlyEqualIsNotABreach(t *testing.T) {
 	in := baseInput(t, ev("e1", "2026-09-14", -500_00, "bill"))
 	r := Project(in)
