@@ -277,7 +277,7 @@ Optional AI explanation
 
 The following image presents the specific user persona defined for Fintrace.
 
-<!-- Insert User Persona image here -->
+![User Persona image](../media/user_persona.jpeg)
 
 ---
 
@@ -285,4 +285,4 @@ The following image presents the specific user persona defined for Fintrace.
 
 The following image presents the structured user journey map for Fintrace.
 
-<!-- Insert User Journey Map image here -->
+![User Persona image](../media/journey_map.jpeg)
