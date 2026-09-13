@@ -187,7 +187,7 @@ func (b *Builder) salesEvents() []contracts.FinancialEvent {
 					Display:    fmt.Sprintf("%d items / %d orders", items, orders),
 					Provenance: contracts.ProvOlistHistorical,
 					SourceRefs: refs, AsOf: b.Store.Olist.Window.End,
-					Note: "Counted from this seller's own order_items rows only. An Olist order can contain other sellers' items, which are excluded.",
+					Note: "Counted from your own order_items rows only. An Olist order can contain other sellers' items, which are excluded.",
 				},
 			},
 		})

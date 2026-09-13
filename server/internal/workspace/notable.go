@@ -266,7 +266,7 @@ func (b *Builder) notableWeekChain(nw notableWeek, side string, events []contrac
 		Summary: fmt.Sprintf("%s against %s",
 			finance.FormatBRL(w.revenue), finance.FormatBRL(p.revenue)),
 		Explanation: fmt.Sprintf(
-			"In the seven days to %s this seller's recorded item revenue was %s, against %s in the seven days before — a change of %+.1f%%.%s These are the seller's own order-item rows, recorded in the week ending %s, with cancelled and unavailable orders excluded, and redrawn onto today's calendar.",
+			"In the seven days to %s your recorded item revenue was %s, against %s in the seven days before — a change of %+.1f%%.%s These are your own order-item rows, recorded in the week ending %s, with cancelled and unavailable orders excluded, and redrawn onto today's calendar.",
 			finance.HumanDate(w.date), finance.FormatBRL(w.revenue), finance.FormatBRL(p.revenue),
 			nw.pct, peakNote, finance.HumanDate(w.srcEnd)),
 		SourceRefs:     weekRefs,
@@ -288,7 +288,7 @@ func (b *Builder) notableWeekChain(nw notableWeek, side string, events []contrac
 				ID: id + "-change", Label: "Change on the week before",
 				Display: fmt.Sprintf("%+.1f%%", nw.pct), Provenance: contracts.ProvDerived,
 				SourceRefs: weekRefs,
-				Note:       "Both are whole seven-day weeks of this seller's own items.",
+				Note:       "Both are whole seven-day weeks of your own items.",
 			},
 		},
 		Chart:             b.salesChart(),
