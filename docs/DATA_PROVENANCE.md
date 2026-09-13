@@ -160,3 +160,32 @@ per onboarded customer, created at signup rather than by hand — which in turn
 needs the `business`/`customer` record described above. No credentials,
 account ids, or customer ids belonging to this or any sandbox account are
 recorded in this repository.
+
+### Known limitation: the chain rules are hardcoded to this one scenario
+
+`server/internal/workspace/chains.go` produces the two evidence chains
+("Payout timing", "Sales mix") from two Go functions, `payoutTimingChain()`
+and `salesStockChain()`, that reference this demo's specific event ids
+directly in source — `evt-payout`, `evt-asm-supplier`, `evt-asm-rent`,
+`evt-asm-ads`. They are not general rules like "the largest outflow scheduled
+before the next expected inflow"; they are, in effect, "look up the event
+literally named `evt-asm-supplier` and write this sentence about it." If an
+event with a different id existed instead — a second supplier, a seller with
+no rent line — `findEvent()` returns a zero-value event and the chain reasons
+about $0.00 with no error raised.
+
+This was audited deliberately (not discovered as a defect): every number the
+chains produce for **this** seller and **this** set of demo assumptions is
+correct — see the chain-by-chain verification in this project's manual test
+notes. The limitation is generality, not correctness. The projection engine
+(`finance.Project`) and the what-if comparison (`workspace.BuildBranch`) do
+not have this problem — both already operate on whatever events and chains
+they are given, with no event id baked in.
+
+Making the chains scenario-agnostic means replacing the literal id lookups
+with pattern-based rules — e.g. "the largest outflow inside N days of a
+modeled inflow" instead of "the event named `evt-asm-supplier`" — so the same
+two rules could run against a different seller's outflows without code
+changes. That is a rewrite of the rule logic, not a bug fix, and has not been
+done: multi-business generality was out of scope for this demo, which serves
+one seller by design.
