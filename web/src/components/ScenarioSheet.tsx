@@ -34,7 +34,11 @@ export function ScenarioSheet({
   const [category, setCategory] = useState('marketing')
 
   const bp = ws.scenario.delayBreakpoint
-  const changed = scenario.payoutDelayDays !== 0 || !!scenario.proposal || !!scenario.assumptions
+  const changed =
+    scenario.payoutDelayDays !== 0 ||
+    !!scenario.proposal ||
+    !!scenario.assumptions ||
+    (scenario.reserveCents ?? 0) > 0
 
   const quick = [
     bp.found && bp.delayDays > 0
