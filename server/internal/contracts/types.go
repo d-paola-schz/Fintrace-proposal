@@ -269,6 +269,12 @@ type DelayBreakpoint struct {
 	BreachDate     string `json:"breachDate,omitempty"`
 	LowestCents    int64  `json:"lowestCents"`
 	Explanation    string `json:"explanation"`
+	// BreachEventIDs are the ids of every event applied on BreachDate, in the
+	// trial projection that actually breached. A caller narrating "the payment
+	// that pushes it under" must resolve the name from these ids rather than
+	// assume which scheduled outflow is responsible — which event lands on the
+	// breach date depends on the data, not on any single demo scenario.
+	BreachEventIDs []string `json:"breachEventIds"`
 }
 
 // Alternative is one comparable variation of the proposal.
@@ -653,6 +659,7 @@ func sanitizeEvents(es []FinancialEvent) []FinancialEvent {
 // where it expects an array.
 func (r *ScenarioResult) Sanitize() {
 	r.Days = nonNil(r.Days)
+	r.DelayBreakpoint.BreachEventIDs = nonNil(r.DelayBreakpoint.BreachEventIDs)
 	for i := range r.Days {
 		r.Days[i].EventIDs = nonNil(r.Days[i].EventIDs)
 	}

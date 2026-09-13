@@ -65,6 +65,17 @@ func ProposalEvent(p contracts.ProposedDecision, currency string) contracts.Fina
 	}
 }
 
+// eventIDsOnDate returns the ids Project already recorded as applied on date,
+// so a caller can name what actually landed there instead of guessing.
+func eventIDsOnDate(r contracts.ScenarioResult, date string) []string {
+	for _, d := range r.Days {
+		if d.Date == date {
+			return d.EventIDs
+		}
+	}
+	return nil
+}
+
 // FindFirstBreachingDelay walks whole-day payout delays from 1 upward and
 // returns the first delay whose projection falls below the reserve. Delay 0 is
 // evaluated by the caller as the base case.
@@ -83,6 +94,7 @@ func FindFirstBreachingDelay(in Input, horizonDays int) contracts.DelayBreakpoin
 		bp.DelayDays = 0
 		bp.BreachDate = r.FirstBreachDate
 		bp.LowestCents = r.LowestCents
+		bp.BreachEventIDs = eventIDsOnDate(r, r.FirstBreachDate)
 		bp.Explanation = fmt.Sprintf(
 			"Even with the payout arriving on time, projected cash falls below the %s reserve on %s, reaching %s. A payout delay is not what breaks this plan.",
 			FormatUSD(in.ReserveCents), HumanDate(r.FirstBreachDate), FormatUSD(r.LowestCents))
@@ -98,6 +110,7 @@ func FindFirstBreachingDelay(in Input, horizonDays int) contracts.DelayBreakpoin
 			bp.DelayDays = d
 			bp.BreachDate = r.FirstBreachDate
 			bp.LowestCents = r.LowestCents
+			bp.BreachEventIDs = eventIDsOnDate(r, r.FirstBreachDate)
 			bp.Explanation = fmt.Sprintf(
 				"A payout delay of %d day(s) is the first that drops projected cash below the %s reserve, on %s (lowest %s). Shorter delays stay at or above it.",
 				d, FormatUSD(in.ReserveCents), HumanDate(r.FirstBreachDate), FormatUSD(r.LowestCents))
