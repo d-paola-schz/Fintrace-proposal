@@ -6,8 +6,10 @@ events that deserve attention, and a deterministic Go engine answering the only
 question that matters before a purchase: *can I spend this, on this date,
 without breaking my reserve?*
 
+For more info about our proposal go to this document: [PROPOSAL.md](./docs/PROPOSAL.md)
+
 - **Frontend** — React + Vite + TypeScript, Tailwind, custom SVG chains, Recharts.
-- **API and engine** — Go `net/http`, one process serving `/api/*` and the built
+- **API and engine** — Go `net/http`, onoree process serving `/api/*` and the built
   UI. All money is integer cents; all dates are date-only.
 - **Data preparation** — Python + DuckDB, offline, once. Nothing Python runs
   during the demo.
