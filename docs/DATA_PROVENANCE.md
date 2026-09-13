@@ -174,6 +174,13 @@ event with a different id existed instead — a second supplier, a seller with
 no rent line — `findEvent()` returns a zero-value event and the chain reasons
 about $0.00 with no error raised.
 
+A third rule, `notableChains()` in `server/internal/workspace/notable.go`, is
+general rather than hardcoded. It reads the seller's daily sales, finds the peak
+week, the sharpest rise and the sharpest fall among weeks already past, and only
+builds a chain for a move of at least 40% against the week before. A flat
+history produces no chains. Its figures are recomputed from the daily rows in
+its tests.
+
 This was audited deliberately (not discovered as a defect): every number the
 chains produce for **this** seller and **this** set of demo assumptions is
 correct — see the chain-by-chain verification in this project's manual test

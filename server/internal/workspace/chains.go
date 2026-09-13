@@ -16,6 +16,8 @@ import (
 // stress-tested against the owner's reserve.
 // Rule 2 — sales versus availability: a recorded change in this seller's item
 // sales, and the single missing number that stops it becoming a stock decision.
+// Rule 3 — notable weeks, in notable.go: past weeks whose revenue moved sharply
+// against the week before.
 
 const (
 	RulePayoutTiming = "rule-payout-timing"
@@ -29,10 +31,13 @@ const (
 // BuildChains returns the chains for the current scenario result. Tones come
 // from the engine's own findings, so re-running a scenario can change them.
 func (b *Builder) BuildChains(res contracts.ScenarioResult, events []contracts.FinancialEvent) []contracts.Chain {
-	return []contracts.Chain{
-		b.payoutTimingChain(res, events),
-		b.salesStockChain(),
+	sales := b.salesStockChain()
+	out := []contracts.Chain{b.payoutTimingChain(res, events), sales}
+	salesRoot := ""
+	if e, ok := findEvent(events, sales.RootEventID); ok {
+		salesRoot = e.Date
 	}
+	return append(out, b.notableChains(events, salesRoot)...)
 }
 
 // presentEvents keeps only the ids that resolve to an event in this payload.
@@ -188,7 +193,7 @@ func (b *Builder) payoutTimingChain(res contracts.ScenarioResult, events []contr
 		RuleID:  RulePayoutTiming,
 		Summary: "Move the ad spend, or ask for later supplier terms",
 		Explanation: fmt.Sprintf(
-			"Both levers are inside your control and neither depends on the payout arriving. Holding the %s ad charge until after the payout keeps that cash in the account through the tightest days. Asking the supplier to move %s later has the same effect on the balance. Preflight can only show what each does to the cash line — it does not place either request, and it cannot tell you what the ad spend would have earned.",
+			"Both levers are inside your control and neither depends on the payout arriving. Holding the %s ad charge until after the payout keeps that cash in the account through the tightest days. Asking the supplier to move %s later has the same effect on the balance. Fintrace can only show what each does to the cash line — it does not place either request, and it cannot tell you what the ad spend would have earned.",
 			finance.FormatUSD(-eventAmount(events, "evt-asm-ads")), finance.FormatUSD(-supplier.AmountCents)),
 		SourceRefs:     []string{"asm-ads", "asm-supplier"},
 		AssumptionRefs: []string{"asm-reserve"},

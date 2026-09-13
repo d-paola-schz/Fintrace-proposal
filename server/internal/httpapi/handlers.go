@@ -179,7 +179,11 @@ func validateOverrides(a *contracts.AssumptionOverrides, today time.Time) error 
 			if err != nil {
 				return fmt.Errorf("%s date: %w", id, err)
 			}
-			if d.Before(finance.Day(today).AddDate(0, 0, -1)) {
+			// A payment the owner edits is still a schedule, not a record. Dated
+			// before today it would sit on the timeline as a forecast for a day
+			// that has gone, and the projection would silently drop it. This used
+			// to allow yesterday; proposals never did.
+			if d.Before(finance.Day(today)) {
 				return fmt.Errorf("%s cannot be dated in the past", id)
 			}
 			if d.After(finance.Day(today).AddDate(0, 0, finance.MaxHorizonDays)) {
@@ -349,7 +353,7 @@ func (s *Server) answer(ctx context.Context, b *workspace.Builder, ws contracts.
 				MinimumReserveCents: ws.Scenario.ReserveCents,
 			}
 			resp.Answer = "Before running this I need " + missingList(missing) +
-				". Fill it in below and Preflight will project every day against your reserve."
+				". Fill it in below and Fintrace will project every day against your reserve."
 			return resp
 		}
 		change := contracts.ScenarioRequest{
@@ -524,7 +528,7 @@ func buildProposal(e ai.Extraction, ws contracts.WorkspaceResponse, today time.T
 	if e.AmountCents <= 0 {
 		missing = append(missing, contracts.MissingInput{
 			Field: "amountCents", Question: "How much do you want to spend?",
-			WhyItMatters: "The projection needs the exact amount. Preflight will not assume one.",
+			WhyItMatters: "The projection needs the exact amount. Fintrace will not assume one.",
 		})
 	}
 	date := e.Date

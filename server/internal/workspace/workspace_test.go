@@ -822,3 +822,39 @@ func TestABreachingPlanAlwaysReadsAsRisk(t *testing.T) {
 		t.Errorf("breaching plan should read as risk, got %+v", ws.Briefing.Highlight)
 	}
 }
+
+// Anything dated before today has already happened, so it may only appear as a
+// record. A scheduled payment, a modelled payout or a proposed spend is a
+// prediction, and a prediction for a day that has passed would show the owner a
+// forecast of something that either happened or did not.
+func TestNothingPredictedSitsInThePast(t *testing.T) {
+	b := testBuilder(t)
+	today := b.Today.Format(finance.DateLayout)
+	requests := map[string]contracts.ScenarioRequest{
+		"plan":           {},
+		"delayed payout": {PayoutDelayDays: 5},
+		"proposal today": {Proposal: &contracts.ProposedDecision{
+			Description: "Inventory", Category: "inventory", Date: today, AmountCents: 1_000_00,
+		}},
+		"payment moved to today": {Assumptions: &contracts.AssumptionOverrides{
+			Outflows: map[string]contracts.OutflowOverride{"asm-supplier": {Date: &today}},
+		}},
+	}
+	for name, req := range requests {
+		ws := b.Build(req)
+		past := 0
+		for _, e := range ws.Events {
+			if e.Date >= today {
+				continue
+			}
+			past++
+			if e.Certainty != contracts.CertaintyRecorded {
+				t.Errorf("%s: %s is %s but dated %s, before today %s",
+					name, e.ID, e.Certainty, e.Date, today)
+			}
+		}
+		if past == 0 {
+			t.Errorf("%s: no past events at all, so this test proves nothing", name)
+		}
+	}
+}

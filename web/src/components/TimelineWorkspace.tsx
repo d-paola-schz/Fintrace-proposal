@@ -4,7 +4,7 @@ import type { BriefingHighlight, Chain, WorkspaceResponse } from '../types/contr
 import { addDays, daysBetween, parseDay, shortDate, usd } from '../lib/format'
 import { CARD_H, CARD_H_COMPACT, CARD_W, EventCard } from './EventCard'
 import { EventMarker } from './EventMarker'
-import { InsightBand } from './InsightBand'
+import { InsightBand, InsightNote } from './InsightBand'
 import { ChainEntry, ENTRY_DROP, ENTRY_H, ENTRY_W } from './ChainEntry'
 import {
   ChainNodeCard, ChainStrand, DEFAULT_METRICS, NODE_H, NODE_H_COMPACT, layoutChain,
@@ -65,6 +65,16 @@ const BRANCH_DROP = 46
 const BRANCH_LEAD = 64
 /** Width of the card that names the what-if and says what it leaves out. */
 const LABEL_W = 432
+/** How much of the rail is left where it runs off the edge of the canvas. */
+const RUNOFF_OPACITY = 0.28
+/**
+ * Height of the strip along the top of the frame that pinned controls own
+ * while a what-if is active: the way back on the left, the what-if card on the
+ * right. Neither the resting layout nor the camera may put anything under it.
+ */
+const WHATIF_STRIP_H = 124
+/** The same strip when only a chain's close control is pinned. */
+const CLOSE_STRIP_H = 58
 /** Where a what-if event's card sits above its rail. */
 const BRANCH_CARD_LIFT = 24
 
@@ -230,9 +240,10 @@ export function TimelineWorkspace({
   const openBelow = focusLane === 'plan' && focusChain?.direction === 'below'
 
   const gapAbove = clampGap(frameH / 2 - cardBandH - PILL_LANE - (compact ? 12 : 20), FIRST_ABOVE)
-  const aboveNeed = openAbove
+  const topStrip = hasBranch ? WHATIF_STRIP_H : 0
+  const aboveNeed = topStrip + (openAbove
     ? PILL_LANE + cardBandH + FIRST_ABOVE + 2 * gapAbove + nodeH / 2 + (compact ? 18 : 24)
-    : PILL_LANE + cardBandH + ENTRY_DROP + ENTRY_H + 24
+    : PILL_LANE + cardBandH + ENTRY_DROP + ENTRY_H + 24)
 
   /** The what-if rail sits below whatever the plan hangs beneath its own rail. */
   const branchOffset = (planHangsBelow ? dropFor(1) + ENTRY_H : AXIS_LABELS_H + 12) + BRANCH_GAP
@@ -362,7 +373,9 @@ export function TimelineWorkspace({
     })
 
     const availW = Math.max(320, frameW - panelW)
-    const availH = Math.max(240, frameH)
+    // Pinned controls own the top of the frame; the subject is framed below them.
+    const inset = hasBranch ? WHATIF_STRIP_H : CLOSE_STRIP_H
+    const availH = Math.max(240, frameH - inset)
     const zoomFor = (b: Box) =>
       Math.min(availW / (b.x1 - b.x0 + FOCUS_PAD * 2), availH / (b.y1 - b.y0 + FOCUS_PAD * 2))
 
@@ -402,9 +415,9 @@ export function TimelineWorkspace({
     const halfH = availH / (2 * k)
     const view = { x0: cx - halfW, x1: cx + halfW, y0: cy - halfH, y1: cy + halfH }
 
-    return { k, tx: availW / 2 - k * cx + frozen.left, ty: availH / 2 - k * cy + frozen.top, view }
+    return { k, tx: availW / 2 - k * cx + frozen.left, ty: inset + availH / 2 - k * cy + frozen.top, view }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusLayout, frameW, frameH, panelW, placed, cardH, axisY, branchY, revealed, revealedBranch, wi, branch, x, frozen])
+  }, [focusLayout, frameW, frameH, panelW, placed, cardH, axisY, branchY, revealed, revealedBranch, wi, branch, x, frozen, hasBranch])
 
   /** A revealed event gets a card only if the camera's frame actually holds it. */
   const inFrame = (x0: number, y0: number, y1: number) => {
@@ -412,7 +425,14 @@ export function TimelineWorkspace({
     if (!v) return true
     return x0 >= v.x0 && x0 + CARD_W <= v.x1 && y0 >= v.y0 && y1 <= v.y1
   }
+  // Something that has already happened is an event, not a hint, so on the
+  // survey every past event carries its card; only what is still ahead waits
+  // behind a marker. The server guarantees nothing before today is a
+  // prediction, so a past card is always a record. While a chain holds the
+  // camera the usual rule applies instead: a card only if the frame holds it,
+  // or it is drawn half off the edge of the screen.
   const showsCard = (id: string, row: number, date: string) =>
+    (!focusLayout && date < ws.today) ||
     chainRoots.has(id) ||
     (revealed.has(id) && inFrame(x(date) - CARD_W / 2, cardTop(row), cardTop(row) + cardH))
 
@@ -445,13 +465,37 @@ export function TimelineWorkspace({
 
   const railEnd = x(ws.windowEnd) + 44
 
+  // The rail runs off both edges of the canvas instead of stopping in a cap, so
+  // it reads as a line that carries on past what the page shows. Only the
+  // window carries dates and events: past its ends the rail and its tick rhythm
+  // thin out, unlabelled, so nothing there looks like a record or a projection.
+  const runEnd = canvasW - rightInset
+  const runStops = [
+    { at: 0, o: RUNOFF_OPACITY },
+    { at: (EDGE_PAD - 44) / runEnd, o: 1 },
+    { at: railEnd / runEnd, o: 1 },
+    { at: 1, o: RUNOFF_OPACITY },
+  ]
+  const ghostTicks = useMemo(() => {
+    const out: string[] = []
+    const before = Math.ceil(EDGE_PAD / PX_PER_DAY)
+    const after = Math.ceil((canvasW - EDGE_PAD) / PX_PER_DAY)
+    for (let d = -before; d <= after; d += 1) {
+      if (d >= 0 && d <= totalDays) continue
+      const iso = addDays(ws.windowStart, d)
+      if (parseInt(iso.slice(8), 10) % 3 === 1) out.push(iso)
+    }
+    return out
+  }, [ws.windowStart, totalDays, canvasW])
+
   const inWindow = (d?: string) => !!d && d >= ws.windowStart && d <= ws.windowEnd
   const lowMark = inWindow(ws.scenario.lowestDate) ? x(ws.scenario.lowestDate) : null
   const breachMark = inWindow(ws.scenario.firstBreachDate) ? x(ws.scenario.firstBreachDate!) : null
 
   // ---- The branch.
   const branchStartX = branch ? x(branch.startDate) : 0
-  const branchEndX = branch ? Math.min(canvasW - 24, x(branch.endDate) + 44) : 0
+  // Like the plan rail, the what-if runs off the edge rather than capping.
+  const branchEndX = branch ? canvasW + RAIL_H : 0
 
   /**
    * Where the branch leaves the plan rail: a little before the change, and
@@ -495,13 +539,15 @@ export function TimelineWorkspace({
   const wLowX = wRes && onBranch(wRes.lowestDate) ? x(wRes.lowestDate) : null
   const wBreachX = wRes && onBranch(wRes.firstBreachDate) ? x(wRes.firstBreachDate!) : null
 
-  // When a what-if appears, bring its branch and label into view.
+  // When a what-if appears, bring its branch into view. Its card is pinned to the
+  // top-right of the frame now, so only a short lead before the branch start is
+  // needed, not room for a card beside it.
   const branchKey = branch ? `${branch.startDate}|${branch.label}` : ''
   useEffect(() => {
     const el = scrollRef.current
     if (!el || !branchKey || focused) return
     const visibleW = el.clientWidth - rightInset
-    const left = branchFromX - 14 - LABEL_W - 24
+    const left = branchFromX - 160
     const right = branchStartX + 280
     let sl = el.scrollLeft
     if (left < sl) sl = Math.max(0, left)
@@ -511,6 +557,20 @@ export function TimelineWorkspace({
     el.scrollTo({ left: sl, top: st, behavior: 'smooth' })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [branchKey])
+
+  /** Scroll a reading's coloured stretch to the middle of the frame. */
+  const showBand = (lane: Lane) => {
+    const el = scrollRef.current
+    const h = lane === 'whatif' ? branchHighlight : ws.briefing.highlight
+    if (!el || !h) return
+    const mid = (x(h.startDate) + x(h.endDate)) / 2
+    const railY = lane === 'whatif' ? branchY : axisY
+    el.scrollTo({
+      left: Math.max(0, mid - (el.clientWidth - rightInset) / 2),
+      top: Math.max(0, railY - el.clientHeight / 2),
+      behavior: 'smooth',
+    })
+  }
 
   return (
     <div ref={frameRef} className="relative h-full min-h-0">
@@ -561,28 +621,44 @@ export function TimelineWorkspace({
               <filter id="railShadowWhatIf" x="-2%" y="-320%" width="104%" height="740%">
                 <feDropShadow dx="0" dy="2" stdDeviation="2.4" floodColor="#4c1d95" floodOpacity="0.26" />
               </filter>
+              <linearGradient id="railRunoffFade" gradientUnits="userSpaceOnUse" x1={0} y1={0} x2={runEnd} y2={0}>
+                {runStops.map((s, i) => (
+                  <stop key={i} offset={s.at} stopColor="#ffffff" stopOpacity={s.o} />
+                ))}
+              </linearGradient>
+              <mask id="railRunoff" maskUnits="userSpaceOnUse" x={0} y={0} width={canvasW} height={canvasH}>
+                <rect x={0} y={0} width={canvasW} height={canvasH} fill="url(#railRunoffFade)" />
+              </mask>
             </defs>
 
             <g style={{ opacity: focused ? CONTEXT_DIM : 1, transition: 'opacity 380ms ease' }}>
+             <g mask="url(#railRunoff)">
               {weeks.map((iso) => (
                 <line key={`wk-${iso}`} x1={x(iso)} y1={18} x2={x(iso)} y2={canvasH - 18}
                   stroke="#1b2b4b" strokeWidth={1} opacity={0.05} />
               ))}
 
               <g filter="url(#railShadow)">
-                <rect x={EDGE_PAD - 44} y={axisY - RAIL_H / 2}
-                  width={Math.max(0, todayX - (EDGE_PAD - 44))} height={RAIL_H}
+                <rect x={-RAIL_H} y={axisY - RAIL_H / 2}
+                  width={Math.max(0, todayX + RAIL_H)} height={RAIL_H}
                   rx={RAIL_H / 2} fill="url(#railRecorded)" />
                 <rect x={todayX} y={axisY - RAIL_H / 2}
-                  width={Math.max(0, railEnd - todayX)} height={RAIL_H}
+                  width={Math.max(0, canvasW + RAIL_H - todayX)} height={RAIL_H}
                   rx={RAIL_H / 2} fill="url(#railProjected)" />
                 <rect x={todayX} y={axisY - RAIL_H / 2}
-                  width={Math.max(0, railEnd - todayX)} height={RAIL_H}
+                  width={Math.max(0, canvasW + RAIL_H - todayX)} height={RAIL_H}
                   rx={RAIL_H / 2} fill="url(#railHatch)" opacity={0.5} />
               </g>
-              <line x1={EDGE_PAD - 40} y1={axisY - RAIL_H / 2 + 1.6} x2={railEnd - 4}
+              <line x1={0} y1={axisY - RAIL_H / 2 + 1.6} x2={canvasW}
                 y2={axisY - RAIL_H / 2 + 1.6} stroke="#ffffff" strokeWidth={1.2}
-                opacity={0.42} strokeLinecap="round" />
+                opacity={0.42} />
+
+              {/* The tick rhythm carries on past the window, without dates. */}
+              {ghostTicks.map((iso) => (
+                <line key={`ghost-${iso}`} x1={x(iso)} y1={axisY + RAIL_H / 2 + 2} x2={x(iso)}
+                  y2={axisY + RAIL_H / 2 + 7} stroke="#9aa8bd" strokeWidth={1} />
+              ))}
+             </g>
 
               {ticks.map((iso) => (
                 <g key={iso}>
@@ -613,6 +689,7 @@ export function TimelineWorkspace({
                   fill="none" stroke="#8b5cf6" strokeWidth={4} strokeLinecap="round"
                   strokeLinejoin="round" opacity={0.8} pathLength={1} className="branch-draw"
                 />
+                <g mask="url(#railRunoff)">
                 <g className="branch-grow">
                 <g filter="url(#railShadowWhatIf)">
                   <rect x={branchStartX - RAIL_H / 2} y={branchY - RAIL_H / 2}
@@ -622,9 +699,10 @@ export function TimelineWorkspace({
                     width={Math.max(RAIL_H, branchEndX - branchStartX + RAIL_H / 2)} height={RAIL_H}
                     rx={RAIL_H / 2} fill="url(#railHatch)" opacity={0.4} />
                 </g>
-                <line x1={branchStartX} y1={branchY - RAIL_H / 2 + 1.6} x2={branchEndX - 4}
+                <line x1={branchStartX} y1={branchY - RAIL_H / 2 + 1.6} x2={canvasW}
                   y2={branchY - RAIL_H / 2 + 1.6} stroke="#ffffff" strokeWidth={1.2}
                   opacity={0.42} strokeLinecap="round" />
+                </g>
                 </g>
 
                 {/* stems for what-if events showing a card */}
@@ -739,41 +817,7 @@ export function TimelineWorkspace({
 
           {branch && wi && (
             <div key={branchKey} className="branch-fade">
-              {/* The name of the what-if, the way back, and what it leaves out.
-                  It stays readable while a what-if chain is open: the owner must
-                  never lose track of reading a hypothetical. */}
-              <section
-                aria-label={`What-if: ${branch.label}`}
-                className="absolute z-20 -translate-y-1/2 rounded-xl border border-[#ddd0f7] bg-white/95 px-3 py-2 shadow-[0_6px_18px_-10px_rgba(76,29,149,0.45)]"
-                style={{ left: branchFromX - 14 - LABEL_W, top: branchY, width: LABEL_W, ...recede(branchHidden) }}
-              >
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className="shrink-0 rounded bg-[#6d28d9] px-1.5 py-[2px] text-[9.5px] font-bold uppercase tracking-[0.07em] text-white">
-                    What-if
-                  </span>
-                  {/* Never truncated: the date is the part most likely to be cut, and
-                      it is the part that says where the branch starts. */}
-                  <span className="tnum min-w-0 flex-1 text-[12.5px] font-semibold leading-tight text-[#4c1d95] [overflow-wrap:anywhere]">
-                    {branch.label}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={onCloseWhatIf}
-                    className="shrink-0 rounded-md border border-[#ddd0f7] bg-white px-2 py-[3px] text-[11px] font-medium text-[#5b21b6] hover:bg-[#f5f0ff]"
-                  >
-                    Back to my plan
-                  </button>
-                </div>
-                <p className="mt-1 text-[11px] leading-snug text-[#5b4a7a]">{branch.note}</p>
-                {(branch.moves ?? []).map((m) => {
-                  const ev = wi.events.find((e) => e.id === m.eventId)
-                  return (
-                    <span key={m.eventId} className="sr-only">
-                      {ev?.label ?? 'An event'} moves from {shortDate(m.fromDate)} to {shortDate(m.toDate)}.
-                    </span>
-                  )
-                })}
-              </section>
+
 
               {branchHighlight && (
                 <div style={recede(branchHidden)}>
@@ -923,13 +967,72 @@ export function TimelineWorkspace({
         </div>
       </div>
 
-      {/* The way out sits outside the transform layer, so it holds the same
-          corner whatever the camera is doing. */}
+      {/* The way back from a what-if is the most important control on the screen
+          while one is shown, so it owns the top-left corner and does not move
+          with the camera, fade with a chain, or hide behind anything. */}
+      {hasBranch && (
+        <button
+          type="button"
+          onClick={onCloseWhatIf}
+          className="deck-in absolute left-4 top-4 z-40 flex items-center gap-2 rounded-full bg-[#6d28d9] px-4 py-2.5 text-[13.5px] font-semibold text-white shadow-[0_10px_24px_-10px_rgba(76,29,149,0.75)] ring-4 ring-[#6d28d9]/15 transition-colors hover:bg-[#5b21b6]"
+        >
+          <span aria-hidden>←</span>
+          Back to my plan
+        </button>
+      )}
+
+      {/* The name of the what-if and what it leaves out, pinned top-right. It sits
+          left of any open panel, and it never fades: the owner must never lose
+          track of reading a hypothetical. */}
+      {branch && wi && (
+        <section
+          key={branchKey}
+          aria-label={`What-if: ${branch.label}`}
+          className="deck-in absolute top-4 z-40 rounded-xl border border-[#ddd0f7] bg-white/95 px-3.5 py-2.5 shadow-[0_10px_28px_-12px_rgba(76,29,149,0.45)] backdrop-blur"
+          style={{ right: 16 + rightInset, width: Math.max(240, Math.min(LABEL_W, frameW - rightInset - 230)) }}
+        >
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="shrink-0 rounded bg-[#6d28d9] px-1.5 py-[2px] text-[9.5px] font-bold uppercase tracking-[0.07em] text-white">
+              What-if
+            </span>
+            {/* Never truncated: the date is the part most likely to be cut, and
+                it is the part that says where the branch starts. */}
+            <span className="tnum min-w-0 flex-1 text-[12.5px] font-semibold leading-tight text-[#4c1d95] [overflow-wrap:anywhere]">
+              {branch.label}
+            </span>
+          </div>
+          <p className="mt-1 text-[11px] leading-snug text-[#5b4a7a]">{branch.note}</p>
+          {(branch.moves ?? []).map((m) => {
+            const ev = wi.events.find((e) => e.id === m.eventId)
+            return (
+              <span key={m.eventId} className="sr-only">
+                {ev?.label ?? 'An event'} moves from {shortDate(m.fromDate)} to {shortDate(m.toDate)}.
+              </span>
+            )
+          })}
+        </section>
+      )}
+
+      {/* The coloured stretch's reading, pinned bottom-right, left of any open
+          panel. It goes away while a chain holds the camera, so it never sits on
+          a chain link. */}
+      <InsightNote
+        plan={ws.briefing.highlight ?? null}
+        whatIf={branchHighlight}
+        hidden={focused}
+        style={{ right: 16 + rightInset }}
+        onOpen={(lane) => onOpenInsight(lane)}
+        onShow={showBand}
+      />
+
+      {/* A chain's way out sits outside the transform layer too, beneath the way
+          back from a what-if when both are shown. */}
       {focusLayout && (
         <button
           type="button"
           onClick={() => onToggleChain(focusLayout.chain.id, focusLayout.lane)}
-          className={`deck-in absolute left-4 top-4 z-40 flex items-center gap-1.5 rounded-full border bg-white/80 px-3 py-[5px] text-[11.5px] font-medium shadow-sm backdrop-blur transition-colors hover:bg-white ${
+          style={{ top: hasBranch ? 16 + 46 + 10 : 16 }}
+          className={`deck-in absolute left-4 z-40 flex items-center gap-1.5 rounded-full border bg-white/80 px-3 py-[5px] text-[11.5px] font-medium shadow-sm backdrop-blur transition-colors hover:bg-white ${
             focusLayout.lane === 'whatif' ? 'border-[#ddd0f7] text-[#5b21b6]' : 'border-[#c8d9f7] text-[#26457f]'
           }`}
         >

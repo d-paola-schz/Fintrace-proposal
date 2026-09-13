@@ -158,3 +158,22 @@ func TestHeuristicIntentStillExplainsOpenNodeForInDomainFollowUps(t *testing.T) 
 		}
 	}
 }
+
+// An edited payment is a schedule, not a record, so like a proposal it cannot
+// be put on a day that has already gone. The check used to allow yesterday.
+func TestAnEditedPaymentCannotBeDatedInThePast(t *testing.T) {
+	today := time.Date(2026, 9, 12, 0, 0, 0, 0, time.UTC)
+	at := func(d string) contracts.ScenarioRequest {
+		return contracts.ScenarioRequest{Assumptions: &contracts.AssumptionOverrides{
+			Outflows: map[string]contracts.OutflowOverride{"asm-supplier": {Date: &d}},
+		}}
+	}
+	yesterday := at("2026-09-11")
+	if err := validateScenario(&yesterday, today); err == nil {
+		t.Error("a payment dated yesterday was accepted")
+	}
+	onToday := at("2026-09-12")
+	if err := validateScenario(&onToday, today); err != nil {
+		t.Errorf("a payment dated today was rejected: %v", err)
+	}
+}

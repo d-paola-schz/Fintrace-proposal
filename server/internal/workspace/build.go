@@ -188,7 +188,7 @@ func (b *Builder) missingInputs(req contracts.ScenarioRequest) []contracts.Missi
 		out = append(out, contracts.MissingInput{
 			Field:        "expectedBenefit",
 			Question:     "What do you expect this spend to bring in, and by when?",
-			WhyItMatters: "Preflight can tell you whether the cash survives the month. It cannot tell you whether the spend is worth making, because nothing in the connected records measures what advertising or stock earns back.",
+			WhyItMatters: "Fintrace can tell you whether the cash survives the month. It cannot tell you whether the spend is worth making, because nothing in the connected records measures what advertising or stock earns back.",
 		})
 	}
 	out = append(out, contracts.MissingInput{
