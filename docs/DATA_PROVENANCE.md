@@ -11,7 +11,7 @@ which one it came from.
 CC BY-NC-SA 4.0): about 99,441 orders and 112,650 order items placed between
 2016 and 2018. We retrieved it from a public GitHub mirror and checked its row
 counts against the published dataset before using it. The SHA-256 of each file
-is recorded in `data/olist-seller-summary.json`.
+is recorded in `data/olist-seller-summary.json`, comes from: [This link](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce/data?select=olist_orders_dataset.csv)
 
 **The seller.** The brief named `3442f8959a84dea7ee197c632cb2df15`. That seller
 has **3 order items across 3 days** — it cannot support a 30-day cash
