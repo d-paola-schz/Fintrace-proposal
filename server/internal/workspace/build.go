@@ -182,6 +182,24 @@ func (b *Builder) baselineSource() string {
 	return "Committed demo fixture — not retrieved from Nessie"
 }
 
+// BaselineCaveat is the same real-vs-fixture honesty check as baselineSource,
+// worded for the owner's ear instead of an audit trail. The chat voice talks
+// about "your cash" throughout — it should never name the vendor or say
+// "sandbox" — but it must still say plainly when a figure is a stand-in
+// rather than a live reading, because that is the one thing this product can
+// never blur. Citations elsewhere (Data & assumptions, "show the math") still
+// carry the full technical wording from baselineSource for anyone who wants
+// it; this is only for the sentence spoken back to the owner.
+func (b *Builder) BaselineCaveat() string {
+	if _, prov := b.balanceCents(); prov == contracts.ProvUserEntered {
+		return ""
+	}
+	if b.Nessie.Source == "live" {
+		return ""
+	}
+	return " That figure is a placeholder for this demo, not a live reading of your account."
+}
+
 func (b *Builder) missingInputs(req contracts.ScenarioRequest) []contracts.MissingInput {
 	var out []contracts.MissingInput
 	if req.Proposal != nil && req.Proposal.AmountCents > 0 {

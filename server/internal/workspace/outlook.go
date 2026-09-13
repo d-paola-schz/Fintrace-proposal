@@ -105,10 +105,8 @@ func (b *Builder) BuildOutlook(
 	bp := res.DelayBreakpoint
 	if bp.Found && bp.DelayDays > 0 {
 		payoutDate := ""
-		for _, e := range events {
-			if e.ID == "evt-payout" {
-				payoutDate = finance.HumanDate(e.Date)
-			}
+		if e, ok := findEventByKind(events, finance.PayoutEventKind); ok {
+			payoutDate = finance.HumanDate(e.Date)
 		}
 		label := fmt.Sprintf("If the payout is %d days late", bp.DelayDays)
 		if payoutDate != "" {
