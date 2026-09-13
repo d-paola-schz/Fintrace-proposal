@@ -170,7 +170,7 @@ export function ScenarioSheet({
           </button>
         </div>
         <p className="mt-1.5 text-[10.5px] leading-snug text-muted">
-          Preflight projects what this does to your cash. It cannot tell you what the spend would
+          Fintrace projects what this does to your cash. It cannot tell you what the spend would
           earn back — nothing in the connected records measures that.
         </p>
       </Section>

@@ -169,7 +169,7 @@ export function ScenarioControls({
             </button>
           )}
           <p className="w-full text-[10px] text-muted">
-            Nothing here is scheduled or paid. Preflight only projects what this would do to your
+            Nothing here is scheduled or paid. Fintrace only projects what this would do to your
             cash — it cannot tell you what the spend would earn back.
           </p>
         </div>

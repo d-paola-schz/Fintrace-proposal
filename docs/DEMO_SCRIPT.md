@@ -4,19 +4,26 @@ Open the URL a minute before you present. Start with the workspace untouched.
 
 **1 — The timeline (10s).** One horizontal axis through the middle of the
 screen. Solid to the left of today, dashed to the right. The opening screen is
-deliberately quiet: only the two events a chain hangs from carry a card, and
-every other event sits on the rail as a bead — filled for cash in, hollow for
-cash out. Hover or tab to one and its full card appears. Two pills mark what
+split at today. Everything that has already happened carries its card, marked
+recorded, with a solid edge. What is still ahead stays quiet: only an event a
+chain hangs from carries a card, and every other upcoming event sits on the rail
+as a bead — filled for cash in, hollow for cash out. Hover or tab to one and its
+full card appears. Nothing before today is ever a prediction; the server refuses
+to put a scheduled payment or a proposed spend on a day that has passed. Two pills mark what
 matters before anything is clicked: today's balance, and the lowest point
 ahead. Header badges say `OLIST SNAPSHOT`, `NESSIE SNAPSHOT` (or `FIXTURE`),
 `AI UNAVAILABLE` or `AI LIVE` — the product tells you what it is running on
 before you ask.
 
-Each marker carries a plus, and clicking one opens the event. Drag the rail
-left and roughly three months of this seller's recorded weeks scroll past —
-real recorded weeks, time-shifted like everything else. None of them move the
+Each upcoming marker carries a plus, and clicking one opens the event. Drag the
+rail left and roughly three months of this seller's recorded weeks scroll past
+as cards — real recorded weeks, time-shifted like everything else. None of them move the
 bank balance, and a test enforces that, so scrolling back changes no figure on
-the page.
+the page. A few of those weeks carry a chain of their own — the peak week, the
+sharpest rise and the sharpest fall — chosen by a rule that only fires on a move
+of at least 40% against the week before. Each says what the records show, which
+part moved, and what the week cannot tell you: no cash, no margin, no product
+breakdown.
 
 Say it out loud: *nothing has been hidden, it is waiting to be asked for.*
 

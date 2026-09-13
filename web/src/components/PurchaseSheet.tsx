@@ -58,7 +58,7 @@ export function PurchaseSheet({
   return (
     <Sheet
       title="Check a purchase"
-      subtitle="Preflight projects what this does to your modelled cash. Nothing is scheduled or paid."
+      subtitle="Fintrace projects what this does to your modelled cash. Nothing is scheduled or paid."
       onClose={onClose}
       wide
     >

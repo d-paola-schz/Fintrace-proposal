@@ -183,7 +183,7 @@ function NodePanel({
             ))}
           </ul>
           <p className="mt-1.5 text-[10px] italic leading-snug text-muted">
-            Proposals only. Preflight never contacts a supplier, moves money, or changes anything
+            Proposals only. Fintrace never contacts a supplier, moves money, or changes anything
             outside this screen.
           </p>
         </Section>

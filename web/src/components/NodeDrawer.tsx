@@ -15,7 +15,7 @@ import { ProvenanceChip, TONE_STYLE, ToneMark } from './Tone'
 const ORIGIN_MEANING: Record<string, string> = {
   olist_historical: 'Recorded in the marketplace data.',
   nessie_sandbox: 'From the sandbox bank records.',
-  derived: 'Calculated by Preflight from the figures behind it.',
+  derived: 'Calculated by Fintrace from the figures behind it.',
   user_entered: 'A figure you entered.',
   demo_assumption: 'A modelled assumption for this demonstration, not a record.',
 }
@@ -149,7 +149,7 @@ export function NodeDrawer({
         </div>
       ))}
       <p className="text-[10px] italic leading-snug text-muted">
-        Proposals only. Preflight never contacts a supplier or moves money.
+        Proposals only. Fintrace never contacts a supplier or moves money.
       </p>
     </div>
   )
@@ -200,7 +200,7 @@ export function NodeDrawer({
       {sourcesBlock}
 
       <p className="text-[10.5px] leading-snug text-muted">
-        Worked out by Preflight's own rules, not by a language model. Lowest projected cash{' '}
+        Worked out by Fintrace's own rules, not by a language model. Lowest projected cash{' '}
         {ws.branch ? 'with this what-if' : 'on the current plan'} is{' '}
         <span className="tnum">{usd(ws.scenario.lowestCents)}</span>.
       </p>

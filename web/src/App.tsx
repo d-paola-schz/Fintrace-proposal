@@ -269,10 +269,7 @@ export default function App() {
     <SourceIndexProvider sources={plan.sources ?? []}>
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex shrink-0 items-center gap-3 border-b border-hair bg-white px-6 py-2">
-        <span className="flex h-6 w-6 items-center justify-center rounded bg-[#1b2b4b] text-[12px] font-bold text-white">
-          P
-        </span>
-        <span className="text-[14px] font-semibold tracking-tight text-ink">Preflight</span>
+        <img src="/fintrace-horizontal.png" alt="Fintrace" className="h-6 w-auto" />
         <span className="h-4 w-px bg-hair" />
         <span className="text-[12.5px] text-[#3d4757]">{plan.business.displayName}</span>
         <span className="tnum text-[11.5px] text-muted">

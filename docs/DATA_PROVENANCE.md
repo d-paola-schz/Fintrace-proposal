@@ -161,48 +161,38 @@ needs the `business`/`customer` record described above. No credentials,
 account ids, or customer ids belonging to this or any sandbox account are
 recorded in this repository.
 
-### Chain rules: what was hardcoded, what got fixed, what's still open
+### Known limitation: the chain rules are hardcoded to this one scenario
 
 `server/internal/workspace/chains.go` produces the two evidence chains
 ("Payout timing", "Sales mix") from two Go functions, `payoutTimingChain()`
-and `salesStockChain()`. An audit (swapping in a second, unrelated Olist
-seller's data with no code changes, purely to see what broke) found real
-narrative bugs, not just a generality gap. All were fixed except one, which
-is a genuine scope decision, not an oversight.
+and `salesStockChain()`, that reference this demo's specific event ids
+directly in source — `evt-payout`, `evt-asm-supplier`, `evt-asm-rent`,
+`evt-asm-ads`. They are not general rules like "the largest outflow scheduled
+before the next expected inflow"; they are, in effect, "look up the event
+literally named `evt-asm-supplier` and write this sentence about it." If an
+event with a different id existed instead — a second supplier, a seller with
+no rent line — `findEvent()` returns a zero-value event and the chain reasons
+about $0.00 with no error raised.
 
-**Fixed.**
+A third rule, `notableChains()` in `server/internal/workspace/notable.go`, is
+general rather than hardcoded. It reads the seller's daily sales, finds the peak
+week, the sharpest rise and the sharpest fall among weeks already past, and only
+builds a chain for a move of at least 40% against the week before. A flat
+history produces no chains. Its figures are recomputed from the daily rows in
+its tests.
 
-- *The chain used to look up events by a literal id* (`findEvent(events,
-  "evt-payout")`, `"evt-asm-supplier"`) — a seller with the same roles under
-  different ids would have silently reasoned about a zero-value event.
-  `payoutTimingChain()` now resolves the payout and the supplier payment by
-  **`Kind`** (`findEventByKind`, matching `finance.PayoutEventKind` /
-  `"supplier_payment"`), which is a role normalize.go already assigns and
-  isn't tied to any one dataset's naming.
-- *The narrative used to guess which outflow caused a reserve breach*,
-  hardcoding "rent" for a delayed breach and "supplier" for an immediate
-  one — correct for this seller's data only by coincidence. `finance.
-  FindFirstBreachingDelay` now reports `DelayBreakpoint.BreachEventIDs`, the
-  ids the engine itself found applied on the breach day, and
-  `blamedOutflow()` names whichever of those is the largest real outflow —
-  never assumed by name.
-- *The days-between-events figure was a literal string* (`"3 days"`,
-  "three days later") that stayed "3" even after a payout delay moved the
-  actual gap to 8 days. `dayGap()` now computes it from the events' real
-  dates on every request.
-- *`salesStockChain()`'s revenue sentence assumed the demo seller's
-  coincidence was a rule*: it always said "up" and "the same count" because
-  Casa Girassol happens to have identical item counts in both 30-day
-  windows. A seller with falling revenue or a different item count produced
-  "Revenue up -36.7%, same volume" — a contradiction in its own sentence.
-  The direction and the count comparison are now computed from the actual
-  numbers.
+This was audited deliberately (not discovered as a defect): every number the
+chains produce for **this** seller and **this** set of demo assumptions is
+correct — see the chain-by-chain verification in this project's manual test
+notes. The limitation is generality, not correctness. The projection engine
+(`finance.Project`) and the what-if comparison (`workspace.BuildBranch`) do
+not have this problem — both already operate on whatever events and chains
+they are given, with no event id baked in.
 
-**Still open, and left alone on purpose.** Node 3 of "Payout timing" ("Two
-ways to protect the reserve") hardcodes that the two available levers are
-always ad spend and the supplier payment (`evt-asm-ads` is still a literal
-id). Generalizing this means deciding, in code, which categories of outflow
-count as a "movable lever" at all and producing a variable-length list
-instead of always exactly two — a rule-design decision, not a lookup fix,
-and one Casa Girassol's data never exposes as wrong (it always has both).
-Left for whoever next changes the underlying event set.
+Making the chains scenario-agnostic means replacing the literal id lookups
+with pattern-based rules — e.g. "the largest outflow inside N days of a
+modeled inflow" instead of "the event named `evt-asm-supplier`" — so the same
+two rules could run against a different seller's outflows without code
+changes. That is a rewrite of the rule logic, not a bug fix, and has not been
+done: multi-business generality was out of scope for this demo, which serves
+one seller by design.
